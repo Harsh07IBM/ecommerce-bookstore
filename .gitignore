@@ -1,0 +1,84 @@
+# ============================================================
+# .gitignore  —  project-wide ignore rules.
+#
+# Stops specific files from being committed to git. Most are local
+# build output, IDE metadata, or OS clutter — none of which should
+# live in the shared repo.
+#
+# backend/.gitignore has its own Java/Maven-specific rules. This
+# file layers on top for anything the whole project cares about.
+# ============================================================
+
+
+# ----- Maven / Java build output -----
+target/
+*.class
+hs_err_pid*
+replay_pid*
+
+
+# ----- IDE: IntelliJ IDEA -----
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+
+# ----- IDE: VS Code -----
+.vscode/
+*.code-workspace
+
+
+# ----- IDE: Eclipse / Spring Tool Suite -----
+.classpath
+.project
+.settings/
+.springBeans
+.sts4-cache
+bin/
+
+
+# ----- IDE: NetBeans -----
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+env/
+
+
+# ----- Logs -----
+*.log
+logs/
+log/
+
+
+# ----- OS junk -----
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+
+# ----- Editor swap files -----
+*.swp
+*.swo
+*~
+
+
+# ----- Local env / secrets  (defensive — we don't have any of these today) -----
+.env
+.env.local
+*.pem
+*.key
+secrets/
