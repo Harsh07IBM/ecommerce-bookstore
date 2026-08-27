@@ -22,8 +22,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+
+import com.harsh.bookstore.entity.Category;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -168,13 +171,17 @@ public class Book {
     private String language;
 
     /**
-     * A single primary category — "Fiction", "Technology", "History", etc.
-     * We keep it as a plain String here (no separate Category entity) to
-     * keep FEAT-01 simple. FEAT-02 will introduce a proper Category entity
-     * and refactor this into a @ManyToOne relationship.
+     * The category this book belongs to.
+     *
+     * FEAT-02: upgraded from a plain String to a @ManyToOne relationship.
+     *   - FetchType.EAGER — every book response includes its category name,
+     *     so we always want it loaded alongside the book in the same query.
+     *   - @JoinColumn(name = "category_id") — the FK column on the book table.
+     *   - nullable = false — every book must have a category.
      */
-    @Column(nullable = false, length = 100)
-    private String category;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 
     /**
      * Selling price in Indian Rupees.
@@ -284,8 +291,8 @@ public class Book {
     public String getLanguage() { return language; }
     public void setLanguage(String language) { this.language = language; }
 
-    public String getCategory() { return category; }
-    public void setCategory(String category) { this.category = category; }
+    public Category getCategory() { return category; }
+    public void setCategory(Category category) { this.category = category; }
 
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
