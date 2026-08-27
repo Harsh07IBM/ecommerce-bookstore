@@ -1,6 +1,7 @@
 package com.harsh.bookstore.controller;
 
 import com.harsh.bookstore.dto.BookDto;
+import com.harsh.bookstore.dto.BookFilter;
 import com.harsh.bookstore.dto.PagedResponse;
 import com.harsh.bookstore.service.BookService;
 
@@ -10,6 +11,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.math.BigDecimal;
+import java.util.List;
 
 
 /**
@@ -76,21 +80,48 @@ public class BookController {
     @GetMapping
     public PagedResponse<BookDto> listBooks(
             @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "12") int size) {
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(required = false)    String q,
+            @RequestParam(required = false)    String category,
+            @RequestParam(required = false)    BigDecimal minPrice,
+            @RequestParam(required = false)    BigDecimal maxPrice,
+            @RequestParam(required = false)    Boolean available,
+            @RequestParam(required = false)    String sort) {
 
-        // ---- Input validation ----
-        // The service could throw its own error later — but a clear early
-        // check gives the client a clean 400 with a helpful message.
-        if (page < 0) {
+        // --- Validation ---
+        if (page < 0)
             throw new IllegalArgumentException("page must be >= 0");
-        }
-        if (size < 1 || size > 100) {
+        if (size < 1 || size > 100)
             throw new IllegalArgumentException("size must be between 1 and 100");
+        if (q != null && q.isBlank())
+            throw new IllegalArgumentException("q must not be blank when provided");
+        if (minPrice != null && minPrice.compareTo(BigDecimal.ZERO) < 0)
+            throw new IllegalArgumentException("minPrice must be >= 0");
+        if (maxPrice != null && maxPrice.compareTo(BigDecimal.ZERO) <= 0)
+            throw new IllegalArgumentException("maxPrice must be > 0");
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0)
+            throw new IllegalArgumentException("minPrice must be <= maxPrice");
+        if (sort != null && !List.of("newest", "price_asc", "price_desc").contains(sort))
+            throw new IllegalArgumentException("sort must be one of: newest, price_asc, price_desc");
+
+        // --- No search/filter params: preserve exact FEAT-01 behaviour (and FEAT-02 category branch) ---
+        boolean hasFilters = (q != null || category != null || minPrice != null
+                              || maxPrice != null || available != null || sort != null);
+
+        if (!hasFilters) {
+            return PagedResponse.from(bookService.listBooks(page, size));
         }
 
-        // ---- Delegate + wrap for return ----
-        Page<BookDto> pageResult = bookService.listBooks(page, size);
-        return PagedResponse.from(pageResult);
+        // --- Build filter and delegate to unified search method ---
+        BookFilter filter = new BookFilter();
+        filter.setQ(q);
+        filter.setCategorySlug(category);
+        filter.setMinPrice(minPrice);
+        filter.setMaxPrice(maxPrice);
+        filter.setAvailableOnly(Boolean.TRUE.equals(available));
+        filter.setSort(sort);
+
+        return PagedResponse.from(bookService.listBooks(filter, page, size));
     }
 
 

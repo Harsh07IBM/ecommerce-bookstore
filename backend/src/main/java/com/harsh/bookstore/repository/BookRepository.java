@@ -1,7 +1,11 @@
 package com.harsh.bookstore.repository;
 
 import com.harsh.bookstore.entity.Book;
+import com.harsh.bookstore.entity.Category;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 
@@ -55,8 +59,13 @@ import org.springframework.stereotype.Repository;
  *   exceptions into generic DataAccessException.
  */
 @Repository
-public interface BookRepository extends JpaRepository<Book, Long> {
+public interface BookRepository
+        extends JpaRepository<Book, Long>,
+                JpaSpecificationExecutor<Book> {
 
-    // Empty on purpose — every method we need for FEAT-01 is inherited.
-
+    /**
+     * FEAT-02: returns a paginated page of books belonging to a specific category.
+     * Spring Data generates: SELECT * FROM book WHERE category_id = ? ORDER BY ... LIMIT ? OFFSET ?
+     */
+    Page<Book> findByCategory(Category category, Pageable pageable);
 }

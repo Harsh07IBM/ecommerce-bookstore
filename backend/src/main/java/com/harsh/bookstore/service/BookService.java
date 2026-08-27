@@ -1,13 +1,17 @@
 package com.harsh.bookstore.service;
 
 import com.harsh.bookstore.dto.BookDto;
+import com.harsh.bookstore.dto.BookFilter;
 import com.harsh.bookstore.entity.Book;
+import com.harsh.bookstore.entity.Category;
 import com.harsh.bookstore.exception.BookNotFoundException;
 import com.harsh.bookstore.repository.BookRepository;
+import com.harsh.bookstore.repository.BookSpecification;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 
@@ -68,8 +72,11 @@ public class BookService {
      * has EXACTLY ONE constructor, Spring auto-wires it. Adding @Autowired
      * is legal but redundant, and modern Spring style omits it.
      */
-    public BookService(BookRepository bookRepository) {
+    private final CategoryService categoryService;
+
+    public BookService(BookRepository bookRepository, CategoryService categoryService) {
         this.bookRepository = bookRepository;
+        this.categoryService = categoryService;
     }
 
 
@@ -82,28 +89,38 @@ public class BookService {
      *         pagination metadata (total pages, hasNext, etc.)
      */
     public Page<BookDto> listBooks(int page, int size) {
-        // PageRequest.of(...) constructs a Pageable — Spring's way of
-        // describing "which slice of the total results do I want, and how
-        // is it sorted?".
-        //
-        // Sort.by("createdAt").descending() — note "createdAt" is the
-        // JAVA field name on the Book entity, not the DB column
-        // "created_at". Spring Data JPA translates it for us.
         PageRequest pageRequest = PageRequest.of(
-            page,
-            size,
-            Sort.by("createdAt").descending()
+            page, size, Sort.by("createdAt").descending()
         );
-
-        // bookRepository.findAll(pageRequest) returns a Page<Book>.
-        // Page.map(fn) returns a new Page whose content has been
-        // transformed by `fn` — but keeps all the pagination metadata
-        // (totalElements, totalPages, hasNext, hasPrevious) intact.
-        //
-        // `this::toDto` is a "method reference" — shorthand for
-        // `book -> this.toDto(book)`. Both mean the same thing: pass each
-        // Book through toDto and collect the resulting DTOs.
         return bookRepository.findAll(pageRequest).map(this::toDto);
+    }
+
+
+    /**
+     * FEAT-03: unified search + filter entry point.
+     * Builds a dynamic Specification from the BookFilter and delegates to
+     * BookRepository.findAll(Specification, Pageable).
+     * When all filter fields are null/false, behaviour is identical to listBooks().
+     */
+    public Page<BookDto> listBooks(BookFilter filter, int page, int size) {
+        Specification<Book> spec = Specification
+            .where(BookSpecification.hasKeyword(filter.getQ()))
+            .and(BookSpecification.hasCategory(filter.getCategorySlug()))
+            .and(BookSpecification.hasPriceAtLeast(filter.getMinPrice()))
+            .and(BookSpecification.hasPriceAtMost(filter.getMaxPrice()));
+
+        if (filter.isAvailableOnly()) {
+            spec = spec.and(BookSpecification.isAvailable());
+        }
+
+        PageRequest pageRequest = PageRequest.of(page, size, resolveSort(filter.getSort()));
+        return bookRepository.findAll(spec, pageRequest).map(this::toDto);
+    }
+
+    private Sort resolveSort(String sortParam) {
+        if ("price_asc".equals(sortParam))  return Sort.by("price").ascending();
+        if ("price_desc".equals(sortParam)) return Sort.by("price").descending();
+        return Sort.by("createdAt").descending(); // default: newest
     }
 
 
@@ -128,6 +145,21 @@ public class BookService {
             .orElseThrow(() -> new BookNotFoundException(id));
 
         return toDto(book);
+    }
+
+
+    /**
+     * Return a paginated page of books belonging to the given category slug.
+     * Ordered newest first, page size as requested.
+     *
+     * @throws CategoryNotFoundException if the slug does not match any category.
+     */
+    public Page<BookDto> listBooksByCategory(String slug, int page, int size) {
+        Category category = categoryService.getCategoryBySlug(slug); // throws if not found
+        PageRequest pageRequest = PageRequest.of(
+            page, size, Sort.by("createdAt").descending()
+        );
+        return bookRepository.findByCategory(category, pageRequest).map(this::toDto);
     }
 
 
@@ -166,7 +198,9 @@ public class BookService {
         dto.setPublishedDate(book.getPublishedDate());
         dto.setPageCount(book.getPageCount());
         dto.setLanguage(book.getLanguage());
-        dto.setCategory(book.getCategory());
+        // Expose the category's display name — DTO shape is unchanged,
+        // clients still see "category": "Fiction" as a string.
+        dto.setCategory(book.getCategory().getName());
         dto.setPrice(book.getPrice());
 
         // ---- Derived field: availability ----
