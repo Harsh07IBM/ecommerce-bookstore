@@ -6,8 +6,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
 
 
 /**
@@ -63,6 +65,86 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
 
+    // ==================================================================
+    // FEAT-04 handlers
+    // ==================================================================
+
+    /**
+     * 409 Conflict — email address already registered.
+     * Thrown by UserService.register() when existsByEmailIgnoreCase returns true.
+     */
+    @ExceptionHandler(EmailAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleEmailAlreadyExists(
+            EmailAlreadyExistsException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.CONFLICT.value(),
+            HttpStatus.CONFLICT.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+
+    /**
+     * 401 Unauthorized — wrong email or wrong password on login.
+     * Thrown by UserService.login(). Same message for both failure modes
+     * — see InvalidCredentialsException Javadoc for the security rationale.
+     */
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidCredentials(
+            InvalidCredentialsException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.UNAUTHORIZED.value(),
+            HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+    }
+
+
+    /**
+     * 400 Bad Request — Bean Validation failure on a @RequestBody.
+     *
+     * WHEN THIS FIRES (vs the IllegalArgumentException handler below):
+     *   This handler catches MethodArgumentNotValidException, which Spring
+     *   throws when @Valid fails on a @RequestBody parameter — e.g. a blank
+     *   firstName or a malformed email in RegisterRequest.
+     *
+     *   The existing IllegalArgumentException handler catches manual throws
+     *   from controller code (e.g. "page must be >= 0" in BookController).
+     *   Both produce 400 responses — but Spring's exception type differs
+     *   depending on where the validation happens.
+     *
+     * EXTRACTING THE MESSAGE:
+     *   MethodArgumentNotValidException holds a BindingResult containing one
+     *   FieldError per failed constraint. We take the FIRST one and use its
+     *   defaultMessage — which is the custom message= string we wrote on
+     *   the annotation (e.g. "email must be a valid email address").
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(
+            MethodArgumentNotValidException ex, HttpServletRequest request) {
+
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(fe -> fe.getDefaultMessage())
+                .orElse("Validation failed");
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            message,
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+
+
     /**
      * Handle "book not found" specifically. Returns HTTP 404.
      *
@@ -72,14 +154,32 @@ public class GlobalExceptionHandler {
      * automatically when we declare it as a parameter.
      */
     @ExceptionHandler(BookNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNotFound(
+    public ResponseEntity<ErrorResponse> handleBookNotFound(
             BookNotFoundException ex, HttpServletRequest request) {
 
         ErrorResponse body = new ErrorResponse(
-            HttpStatus.NOT_FOUND.value(),          // 404
-            HttpStatus.NOT_FOUND.getReasonPhrase(),// "Not Found"
-            ex.getMessage(),                       // "Book with id 999 was not found"
-            request.getRequestURI()                // "/api/books/999"
+            HttpStatus.NOT_FOUND.value(),
+            HttpStatus.NOT_FOUND.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+
+    /**
+     * Handle "category not found" — returns HTTP 404.
+     * Triggered when BookController receives ?category=unknown-slug.
+     */
+    @ExceptionHandler(CategoryNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleCategoryNotFound(
+            CategoryNotFoundException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.NOT_FOUND.value(),
+            HttpStatus.NOT_FOUND.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }

@@ -129,6 +129,63 @@
         </dependency>
 
         <!--
+          spring-boot-starter-security  —  Spring Security.
+          Brings in the full security filter chain, BCryptPasswordEncoder,
+          UserDetailsService, AuthenticationManager, and all the annotations
+          and classes needed to lock down endpoints and verify JWTs.
+          Adding this dependency immediately activates Spring Security's
+          auto-configuration — the app will start requiring authentication
+          for all endpoints until we configure SecurityConfig in Phase 5.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!--
+          spring-security-test  —  test helpers for Spring Security.
+          Provides SecurityMockMvcRequestPostProcessors (e.g. .with(user(...)))
+          used in @WebMvcTest controller tests to simulate authenticated requests.
+          scope=test — only on the test classpath, never shipped in the jar.
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+          JJWT — build, sign, and parse JWT tokens using HMAC-SHA256.
+          Split into three artifacts:
+            jjwt-api     — the public API we import in our code (@compile scope)
+            jjwt-impl    — the runtime implementation (runtime only — we never
+                           reference its classes directly; JJWT loads it via
+                           the ServiceLoader mechanism at runtime)
+            jjwt-jackson — uses Jackson (already on our classpath) to handle
+                           JSON serialisation inside the JWT library (runtime)
+          Version 0.12.6 is the latest stable release. It uses the fluent
+          builder API (Jwts.builder()...) which differs from the older 0.9.x
+          API shown in many tutorials — watch out for that when reading guides.
+        -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!--
           spring-boot-devtools  —  developer conveniences during dev only.
           Watches class files on disk; when they change, restarts the app
           automatically. Also disables some caches so template/config

@@ -1,22 +1,13 @@
 package com.harsh.bookstore.config;
 
-/*
- * ------------------------------------------------------------------
- * IMPORTS
- * ------------------------------------------------------------------
- * Grouped by origin (a common Java convention):
- *   - Jackson (for turning JSON text into Java objects)
- *   - Our own classes
- *   - SLF4J logger (Spring's standard logging facade)
- *   - Spring annotations
- *   - Java standard library
- */
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.harsh.bookstore.entity.Book;
+import com.harsh.bookstore.entity.Category;
 import com.harsh.bookstore.repository.BookRepository;
+import com.harsh.bookstore.repository.CategoryRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,172 +16,116 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-
+import java.util.Map;
 
 /**
- * BookSeedLoader — populates the `book` table from data/seed/books.json
- * the first time the app runs against an empty database.
+ * BookSeedLoader — populates the `category` and `book` tables from
+ * data/seed/books.json on every fresh startup (H2 is wiped on restart).
  *
- * WHAT THIS CLASS IS (in plain English):
- *   A "startup task". Spring runs its `run(...)` method EXACTLY ONCE
- *   after the application context has finished starting, but BEFORE the
- *   web server begins accepting HTTP requests. Perfect place to prepare
- *   the DB with initial data.
+ * ORDER MATTERS:
+ *   1. Categories are saved first — each book holds a FK to category.id.
+ *   2. Books are saved second, with their Category reference resolved.
  *
- *   Concretely, on every app start this class:
- *     1. Checks if any books already exist. If yes → skip everything (idempotent).
- *     2. Opens the seed JSON file at the path configured in
- *        `application.properties` as `bookstore.seed.file`.
- *     3. Uses Jackson to turn every JSON entry into a Book object.
- *     4. Calls bookRepository.saveAll(...) — Hibernate emits an INSERT
- *        per book.
- *     5. Logs how many were seeded.
+ * SLUG DERIVATION:
+ *   Category name → slug: lowercase, non-alphanumeric runs replaced with "-".
+ *   e.g. "Self-Help" → "self-help", "Technology" → "technology".
  *
- *   If the seed file is missing, it logs a warning and starts with an
- *   empty catalogue. It never crashes the app because of a missing file.
- *
- * WHY IDEMPOTENCY MATTERS:
- *   Every app restart runs this method. If we blindly inserted the 113
- *   books each time, we'd end up with 226, 339, ... after each restart.
- *   The `count() > 0` check makes seeding a no-op after the first run,
- *   which is what "idempotent" means: safe to run any number of times.
- *
- *   For our in-memory H2 database (which is wiped on every restart), the
- *   count is always 0 at startup, so the loader always seeds. But this
- *   pattern is essential the moment we move to a persistent DB.
+ * WHY WE READ JSON AS Map<String,Object> FIRST (not Book directly):
+ *   After FEAT-02, Book.category is a Category entity — not a String.
+ *   Jackson cannot deserialise "category": "Fiction" straight into a
+ *   Category object. We read the raw map, save Category rows ourselves,
+ *   then wire up each Book to its Category by name lookup.
  */
 @Component
 public class BookSeedLoader implements CommandLineRunner {
 
-    /*
-     * SLF4J logger. This is the standard logging library in the Java
-     * world; Spring Boot wires it to Logback under the hood so
-     * `log.info(...)` writes to the console with our chosen format.
-     *
-     * Making it `private static final` is convention — one logger per
-     * class, shared across all instances.
-     */
     private static final Logger log = LoggerFactory.getLogger(BookSeedLoader.class);
 
-
-    /**
-     * The BookRepository. We save books through this. It's `final` because
-     * we set it once in the constructor and never reassign — immutable
-     * dependencies are a good habit.
-     */
     private final BookRepository bookRepository;
+    private final CategoryRepository categoryRepository;
 
-
-    /**
-     * The seed file path, read from application.properties.
-     *
-     * @Value("${bookstore.seed.file}") tells Spring: "when you construct
-     * this bean, look up the property 'bookstore.seed.file' in
-     * application.properties (or environment vars, YAML, etc.) and inject
-     * that value here". The ${...} placeholder is Spring's syntax.
-     *
-     * If the property is missing, Spring throws a startup error — a
-     * feature, not a bug. It prevents silent misconfiguration.
-     */
     @Value("${bookstore.seed.file}")
     private String seedFilePath;
 
-
-    /**
-     * Constructor injection.
-     *
-     * When Spring needs to create a BookSeedLoader (because it saw the
-     * @Component annotation), it looks at this constructor and asks:
-     * "What arguments do I need? Ah — a BookRepository. Do I have one of
-     * those in the context? Yes! Let me pass it in."
-     *
-     * This is "dependency injection" — we never do `new BookRepository(...)`
-     * ourselves. Spring finds it for us because BookRepository extends
-     * JpaRepository, which Spring already registered as a bean.
-     *
-     * Why constructor injection (as opposed to @Autowired on a field)?
-     *   - Makes the dependency explicit and documented
-     *   - Makes the field `final` (immutable)
-     *   - Trivial to test — you just pass a fake BookRepository in
-     *   - Fails fast: Spring can't accidentally create this class without
-     *     a repository
-     */
-    public BookSeedLoader(BookRepository bookRepository) {
+    public BookSeedLoader(BookRepository bookRepository,
+                          CategoryRepository categoryRepository) {
         this.bookRepository = bookRepository;
+        this.categoryRepository = categoryRepository;
     }
 
-
-    /**
-     * The one and only method required by the CommandLineRunner interface.
-     * Spring calls this after startup, once per app lifecycle.
-     *
-     * `throws Exception` because Jackson's readValue can throw IOException
-     * and JsonProcessingException. If either happens, Spring aborts
-     * startup with a clear stack trace — better than silently continuing
-     * with a broken catalogue.
-     */
     @Override
     public void run(String... args) throws Exception {
 
-        // ---- Step 1: idempotency check ----
-        //
-        // If the DB already has books, do nothing. This makes the loader
-        // safe to run on every startup, no matter what state the DB is in.
-        long existingCount = bookRepository.count();
-        if (existingCount > 0) {
-            log.info("Books already present ({}) — skipping seed", existingCount);
+        // Idempotency check — H2 is wiped on restart so this is always 0
+        // in development, but protects against accidental double-seeding
+        // if we later switch to a persistent DB.
+        if (bookRepository.count() > 0) {
+            log.info("Books already present — skipping seed");
             return;
         }
 
-        // ---- Step 2: locate the seed file ----
         File file = new File(seedFilePath);
         if (!file.exists()) {
-            // Absolute path helps the reader (or you, debugging later)
-            // see exactly WHERE we looked.
-            log.warn(
-                "Seed file not found at {} — starting with an empty catalogue",
-                file.getAbsolutePath()
-            );
+            log.warn("Seed file not found at {} — starting with empty catalogue",
+                     file.getAbsolutePath());
             return;
         }
 
-        // ---- Step 3: parse the JSON ----
-        //
-        // ObjectMapper is Jackson's main class for turning JSON into
-        // Java objects (and vice versa).
-        //
-        // We configure it to IGNORE unknown JSON fields, so if the seed
-        // script ever adds a field that Book doesn't have (e.g. a debug
-        // marker), the loader keeps working instead of throwing.
+        // Read the JSON as a raw list of maps so we can control how
+        // the "category" string field is resolved to a Category entity.
         ObjectMapper mapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-        // `new TypeReference<List<Book>>() {}` is Jackson's way of telling
-        // the ObjectMapper: "the JSON is an ARRAY, and each element
-        // should become a Book". Without this TypeReference, generics
-        // get erased at compile time and Jackson wouldn't know what
-        // element type to build.
-        //
-        // The `{}` at the end creates an anonymous subclass — that's what
-        // makes generic-type reflection possible in Java. Odd-looking
-        // idiom, but standard Jackson.
-        List<Book> books = mapper.readValue(
-            file,
-            new TypeReference<List<Book>>() {}
+        List<Map<String, Object>> rawBooks = mapper.readValue(
+            file, new TypeReference<List<Map<String, Object>>>() {}
         );
 
-        // ---- Step 4: bulk insert ----
-        //
-        // saveAll is a single JPA call that emits INSERTs for every book.
-        // Hibernate can batch these into fewer round-trips to the DB —
-        // faster than looping and calling save() 113 times.
+        // --- Step 1: collect distinct category names and save them ---
+        // LinkedHashMap preserves insertion order — deterministic logs.
+        Map<String, Category> categoryByName = new LinkedHashMap<>();
+        for (Map<String, Object> raw : rawBooks) {
+            String name = (String) raw.get("category");
+            if (name != null && !categoryByName.containsKey(name)) {
+                Category cat = new Category();
+                cat.setName(name);
+                cat.setSlug(toSlug(name));
+                categoryByName.put(name, categoryRepository.save(cat));
+            }
+        }
+        log.info("Seeded {} categories", categoryByName.size());
+
+        // --- Step 2: build Book entities, resolve each category by name ---
+        List<Book> books = new ArrayList<>();
+        for (Map<String, Object> raw : rawBooks) {
+            String catName = (String) raw.get("category");
+
+            // Remove "category" from the raw map BEFORE convertValue so Jackson
+            // never tries to deserialise a plain String into a Category entity.
+            // We wire the Category reference ourselves below.
+            raw.remove("category");
+
+            Book book = mapper.convertValue(raw, Book.class);
+            book.setCategory(categoryByName.get(catName));
+            books.add(book);
+        }
+
+        // --- Step 3: bulk insert all books ---
         bookRepository.saveAll(books);
+        log.info("Seeded {} books from {}", books.size(), file.getAbsolutePath());
+    }
 
-        log.info(
-            "Seeded {} books from {}",
-            books.size(),
-            file.getAbsolutePath()
-        );
+    /**
+     * Derives a URL-safe slug from a category name.
+     *   "Self-Help"  → "self-help"
+     *   "Technology" → "technology"
+     *   "Biography"  → "biography"
+     */
+    private String toSlug(String name) {
+        return name.toLowerCase()
+                   .replaceAll("[^a-z0-9]+", "-")
+                   .replaceAll("-+$", "");
     }
 }
