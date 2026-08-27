@@ -1,13 +1,17 @@
 package com.harsh.bookstore.controller;
 
 import com.harsh.bookstore.dto.BookDto;
+import com.harsh.bookstore.dto.BookFilter;
 import com.harsh.bookstore.exception.BookNotFoundException;
+import com.harsh.bookstore.exception.CategoryNotFoundException;
 import com.harsh.bookstore.service.BookService;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.test.web.servlet.MockMvc;
@@ -15,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -55,7 +60,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   The HTTP CONTRACT — status codes, JSON shape, error format. Business
  *   logic is covered by BookServiceTest, entity mapping by BookRepositoryTest.
  */
-@WebMvcTest(BookController.class)
+@WebMvcTest(value = BookController.class,
+        excludeAutoConfiguration = UserDetailsServiceAutoConfiguration.class)
+@Import(com.harsh.bookstore.config.SecurityConfig.class)
 class BookControllerTest {
 
     @Autowired
@@ -64,6 +71,14 @@ class BookControllerTest {
     @MockBean
     private BookService bookService;
 
+    // JwtAuthFilter is a @Component and gets picked up by @WebMvcTest.
+    // It needs JwtService + UserRepository to construct — we mock them here.
+    @MockBean
+    private com.harsh.bookstore.service.JwtService jwtService;
+
+    @MockBean
+    private com.harsh.bookstore.repository.UserRepository userRepository;
+
 
     // ==================================================================
     // GET /api/books
@@ -71,12 +86,10 @@ class BookControllerTest {
 
     @Test
     void listBooks_returns200_withPagedResponseJson() throws Exception {
-        // GIVEN: the mocked service returns a page containing one DTO
         BookDto dto = sampleDto(1L, "Sample Book");
         Page<BookDto> page = new PageImpl<>(List.of(dto));
         when(bookService.listBooks(eq(0), eq(12))).thenReturn(page);
 
-        // WHEN + THEN
         mockMvc.perform(get("/api/books"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content[0].id").value(1))
@@ -84,9 +97,51 @@ class BookControllerTest {
             .andExpect(jsonPath("$.content[0].availability").value("IN_STOCK"))
             .andExpect(jsonPath("$.page").value(0))
             .andExpect(jsonPath("$.totalElements").value(1))
-            // Guard: internal fields must never leak into the JSON
             .andExpect(jsonPath("$.content[0].stockQuantity").doesNotExist())
             .andExpect(jsonPath("$.content[0].createdAt").doesNotExist());
+    }
+
+
+    // FEAT-02 regression + category filter tests
+
+    @Test
+    void listBooks_returns200_withCategoryFilter() throws Exception {
+        // ?category=fiction is a non-null filter param → controller routes through
+        // BookFilter / listBooks(BookFilter, page, size), NOT listBooksByCategory.
+        BookDto dto = sampleDto(1L, "Fiction Book");
+        Page<BookDto> page = new PageImpl<>(List.of(dto));
+        when(bookService.listBooks(any(BookFilter.class), eq(0), eq(12))).thenReturn(page);
+
+        mockMvc.perform(get("/api/books?category=fiction"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].title").value("Fiction Book"));
+    }
+
+    @Test
+    void listBooks_returns404_whenCategoryUnknown() throws Exception {
+        // ?category=nope → BookFilter path → CategoryNotFoundException → 404.
+        when(bookService.listBooks(any(BookFilter.class), eq(0), eq(12)))
+            .thenThrow(new CategoryNotFoundException("nope"));
+
+        mockMvc.perform(get("/api/books?category=nope"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.message").value("Category with slug 'nope' was not found"));
+    }
+
+    @Test
+    void listBooks_noCategory_callsListBooksNotListBooksByCategory() throws Exception {
+        // Regression guard — no ?category param must call listBooks, not listBooksByCategory
+        when(bookService.listBooks(eq(0), eq(12))).thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/books"))
+            .andExpect(status().isOk());
+
+        org.mockito.Mockito.verify(bookService).listBooks(0, 12);
+        org.mockito.Mockito.verify(bookService, org.mockito.Mockito.never())
+            .listBooksByCategory(org.mockito.ArgumentMatchers.any(),
+                                 org.mockito.ArgumentMatchers.anyInt(),
+                                 org.mockito.ArgumentMatchers.anyInt());
     }
 
 

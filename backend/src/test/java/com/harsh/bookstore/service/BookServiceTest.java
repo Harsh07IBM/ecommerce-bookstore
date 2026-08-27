@@ -2,7 +2,9 @@ package com.harsh.bookstore.service;
 
 import com.harsh.bookstore.dto.BookDto;
 import com.harsh.bookstore.entity.Book;
+import com.harsh.bookstore.entity.Category;
 import com.harsh.bookstore.exception.BookNotFoundException;
+import com.harsh.bookstore.exception.CategoryNotFoundException;
 import com.harsh.bookstore.repository.BookRepository;
 
 import org.junit.jupiter.api.Test;
@@ -65,6 +67,9 @@ class BookServiceTest {
     @Mock
     private BookRepository bookRepository;
 
+    @Mock
+    private CategoryService categoryService;
+
     @InjectMocks
     private BookService bookService;
 
@@ -75,20 +80,18 @@ class BookServiceTest {
 
     @Test
     void listBooks_returnsPageOfDtos_mappedFromEntities() {
-        // GIVEN: the mock repo returns a page containing one Book
         Book book = sampleBook(1L, "The Great Gatsby", 10);
         when(bookRepository.findAll(any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(book)));
 
-        // WHEN
         Page<BookDto> result = bookService.listBooks(0, 12);
 
-        // THEN: page has one DTO with the right fields
         assertThat(result.getContent()).hasSize(1);
         BookDto dto = result.getContent().get(0);
         assertThat(dto.getId()).isEqualTo(1L);
         assertThat(dto.getTitle()).isEqualTo("The Great Gatsby");
         assertThat(dto.getAvailability()).isEqualTo("IN_STOCK");
+        assertThat(dto.getCategory()).isEqualTo("Fiction");
     }
 
 
@@ -187,6 +190,11 @@ class BookServiceTest {
      * would already have one.
      */
     private Book sampleBook(Long id, String title, int stockQuantity) {
+        Category cat = new Category();
+        cat.setId(1L);
+        cat.setName("Fiction");
+        cat.setSlug("fiction");
+
         Book b = new Book();
         b.setId(id);
         b.setIsbn("9781234567890");
@@ -195,7 +203,7 @@ class BookServiceTest {
         b.setDescription("Description");
         b.setCoverImageUrl("https://example.com/cover.jpg");
         b.setLanguage("en");
-        b.setCategory("Fiction");
+        b.setCategory(cat);
         b.setPrice(new BigDecimal("299.00"));
         b.setStockQuantity(stockQuantity);
         b.setCreatedAt(LocalDateTime.now());
