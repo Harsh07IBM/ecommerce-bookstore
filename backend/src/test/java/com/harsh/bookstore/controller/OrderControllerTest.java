@@ -5,6 +5,7 @@ import com.harsh.bookstore.config.SecurityConfig;
 import com.harsh.bookstore.dto.BasketResponse;
 import com.harsh.bookstore.dto.OrderAddressSnapshot;
 import com.harsh.bookstore.dto.OrderItemResponse;
+import com.harsh.bookstore.dto.OrderConfirmationResponse;
 import com.harsh.bookstore.dto.OrderResponse;
 import com.harsh.bookstore.dto.PaymentRequest;
 import com.harsh.bookstore.entity.User;
@@ -512,6 +513,66 @@ class OrderControllerTest {
                 .thenThrow(new OrderNotFoundException());
 
         mockMvc.perform(post("/api/orders/99/cancel")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Order not found"));
+    }
+
+
+    // ==================================================================
+    // FEAT-13 — GET /api/orders/{id}/confirmation
+    // ==================================================================
+
+    private OrderConfirmationResponse confirmationResponse() {
+        OrderResponse order = paidResponse();
+        OrderConfirmationResponse resp = new OrderConfirmationResponse();
+        resp.setConfirmationMessage("Thank you for your order!");
+        resp.setOrderId(order.getOrderId());
+        resp.setStatus(order.getStatus());
+        resp.setOrderDate(order.getOrderDate());
+        resp.setItems(order.getItems());
+        resp.setBasketTotal(order.getBasketTotal());
+        resp.setDeliveryCharge(order.getDeliveryCharge());
+        resp.setTotalAmount(order.getTotalAmount());
+        resp.setEstimatedDeliveryDate(order.getEstimatedDeliveryDate());
+        resp.setDeliveryAddress(order.getDeliveryAddress());
+        return resp;
+    }
+
+    @Test
+    void getConfirmation_returns200() throws Exception {
+        when(orderService.getConfirmation(eq(1L), eq(42L))).thenReturn(confirmationResponse());
+
+        mockMvc.perform(get("/api/orders/42/confirmation")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value(42))
+                .andExpect(jsonPath("$.confirmationMessage").isNotEmpty())
+                .andExpect(jsonPath("$.status").value("PAID"));
+    }
+
+    @Test
+    void getConfirmation_returns401_noJwt() throws Exception {
+        mockMvc.perform(get("/api/orders/42/confirmation"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getConfirmation_returns403_wrongOwner() throws Exception {
+        when(orderService.getConfirmation(eq(1L), eq(42L)))
+                .thenThrow(new OrderAccessForbiddenException());
+
+        mockMvc.perform(get("/api/orders/42/confirmation")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getConfirmation_returns404_notFound() throws Exception {
+        when(orderService.getConfirmation(eq(1L), eq(99L)))
+                .thenThrow(new OrderNotFoundException());
+
+        mockMvc.perform(get("/api/orders/99/confirmation")
                         .with(authentication(userAuth())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Order not found"));

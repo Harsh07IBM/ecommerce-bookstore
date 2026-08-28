@@ -4,6 +4,7 @@ import com.harsh.bookstore.dto.AddItemRequest;
 import com.harsh.bookstore.dto.BasketItemDto;
 import com.harsh.bookstore.dto.BasketResponse;
 import com.harsh.bookstore.dto.OrderAddressSnapshot;
+import com.harsh.bookstore.dto.OrderConfirmationResponse;
 import com.harsh.bookstore.dto.OrderItemResponse;
 import com.harsh.bookstore.dto.OrderResponse;
 import com.harsh.bookstore.dto.PaymentRequest;
@@ -79,6 +80,8 @@ public class OrderService {
     private static final BigDecimal DELIVERY_CHARGE_AMOUNT  = new BigDecimal("50.00");
     private static final String     DECLINE_CARD_NUMBER     = "0000000000000000";
     private static final BigDecimal POINTS_RATE             = new BigDecimal("0.05");
+    private static final String     CONFIRMATION_MESSAGE    =
+            "Your order has been placed successfully!";
 
     private final OrderRepository orderRepository;
     private final BasketService basketService;
@@ -134,6 +137,34 @@ public class OrderService {
             throw new OrderAccessForbiddenException();
         }
         return toResponse(order);
+    }
+
+
+    /**
+     * Return a purchase confirmation for the given order (FEAT-13).
+     *
+     * @param userId  the authenticated user's ID
+     * @param orderId the order to confirm
+     * @return OrderConfirmationResponse with confirmation message and full order detail
+     * @throws OrderNotFoundException        if the order does not exist
+     * @throws OrderAccessForbiddenException if the order belongs to another user
+     */
+    public OrderConfirmationResponse getConfirmation(Long userId, Long orderId) {
+        OrderResponse order = getOrderById(userId, orderId);
+        OrderConfirmationResponse response = new OrderConfirmationResponse();
+        response.setConfirmationMessage(CONFIRMATION_MESSAGE);
+        response.setOrderId(order.getOrderId());
+        response.setStatus(order.getStatus());
+        response.setOrderDate(order.getOrderDate());
+        response.setItems(order.getItems());
+        response.setBasketTotal(order.getBasketTotal());
+        response.setDeliveryCharge(order.getDeliveryCharge());
+        response.setGiftPointsRedeemed(order.getGiftPointsRedeemed());
+        response.setTotalAmount(order.getTotalAmount());
+        response.setPointsAwarded(order.getPointsAwarded());
+        response.setEstimatedDeliveryDate(order.getEstimatedDeliveryDate());
+        response.setDeliveryAddress(order.getDeliveryAddress());
+        return response;
     }
 
 

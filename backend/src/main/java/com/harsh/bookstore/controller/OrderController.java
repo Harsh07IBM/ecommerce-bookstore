@@ -1,6 +1,7 @@
 package com.harsh.bookstore.controller;
 
 import com.harsh.bookstore.dto.BasketResponse;
+import com.harsh.bookstore.dto.OrderConfirmationResponse;
 import com.harsh.bookstore.dto.OrderResponse;
 import com.harsh.bookstore.dto.PaymentRequest;
 import com.harsh.bookstore.entity.User;
@@ -99,6 +100,21 @@ public class OrderController {
                                    Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         return orderService.buyAgain(user.getId(), id);
+    }
+
+
+    /**
+     * Get the purchase confirmation for a placed order (FEAT-13).
+     *
+     * @param id             the order ID from the path
+     * @param authentication Spring Security principal — always non-null (JWT required)
+     * @return 200 with OrderConfirmationResponse; 403 if wrong owner; 404 if not found
+     */
+    @GetMapping("/{id}/confirmation")
+    public OrderConfirmationResponse getConfirmation(@PathVariable Long id,
+                                                     Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return orderService.getConfirmation(user.getId(), id);
     }
 
 

@@ -2,6 +2,7 @@ package com.harsh.bookstore.service;
 
 import com.harsh.bookstore.dto.BasketItemDto;
 import com.harsh.bookstore.dto.BasketResponse;
+import com.harsh.bookstore.dto.OrderConfirmationResponse;
 import com.harsh.bookstore.dto.OrderResponse;
 import com.harsh.bookstore.dto.PaymentRequest;
 import com.harsh.bookstore.entity.Book;
@@ -710,5 +711,51 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.cancelOrder(USER_ID, 42L))
                 .isInstanceOf(CancellationWindowExpiredException.class)
                 .hasMessage("Cancellation window has expired");
+    }
+
+
+    // ==================================================================
+    // FEAT-13 — getConfirmation
+    // ==================================================================
+
+    @Test
+    void getConfirmation_returnsConfirmationWithMessage() {
+        Order order = buildSavedOrder(42L, USER_ID, java.time.LocalDateTime.now());
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+
+        OrderConfirmationResponse result = orderService.getConfirmation(USER_ID, 42L);
+
+        assertThat(result.getOrderId()).isEqualTo(42L);
+        assertThat(result.getConfirmationMessage()).isNotBlank();
+    }
+
+    @Test
+    void getConfirmation_throws404_orderNotFound() {
+        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.getConfirmation(USER_ID, 99L))
+                .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    @Test
+    void getConfirmation_throws403_wrongOwner() {
+        Order order = buildSavedOrder(42L, 999L, java.time.LocalDateTime.now());
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.getConfirmation(USER_ID, 42L))
+                .isInstanceOf(OrderAccessForbiddenException.class);
+    }
+
+    @Test
+    void getConfirmation_mapsAllOrderFields() {
+        Order order = buildSavedOrder(42L, USER_ID, java.time.LocalDateTime.now());
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+
+        OrderConfirmationResponse result = orderService.getConfirmation(USER_ID, 42L);
+
+        assertThat(result.getStatus()).isEqualTo("PAID");
+        assertThat(result.getBasketTotal()).isEqualByComparingTo(order.getBasketTotal());
+        assertThat(result.getTotalAmount()).isEqualByComparingTo(order.getTotalAmount());
+        assertThat(result.getPointsAwarded()).isEqualTo(order.getPointsAwarded());
     }
 }
