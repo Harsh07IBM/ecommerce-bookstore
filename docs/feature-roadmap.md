@@ -29,7 +29,7 @@
 | 1 | ✅ Tier 0 | Foundation | FEAT-01 | Complete |
 | 2 | ✅ Tier 1 | Catalogue Completion | FEAT-02, FEAT-03 | Complete |
 | 3 | ✅ Tier 2 | User Identity | FEAT-04 | Complete |
-| 4 | 🔴 Tier 4 | Shopping Backend | FEAT-06, FEAT-07, FEAT-08, FEAT-09 | **Up Next** |
+| 4 | 🟡 Tier 4 | Shopping Backend | FEAT-06, FEAT-07, FEAT-08, FEAT-09 | **In Progress (1/4)** |
 | 5 | ⚫ Tier 5 | Post-Purchase Backend | FEAT-10, FEAT-11, FEAT-12, FEAT-13 | Not Started |
 | 6 | 🟣 Tier 6 | Intelligence Backend | FEAT-14, FEAT-15 | Not Started |
 | 7 | 🟠 Tier 3 | Storefront Frontend | FEAT-05 | Not Started — built last |
@@ -238,43 +238,45 @@
 
 ---
 
-## 🔴 Tier 4 — Shopping Backend *(build order: 4th)*
+## 🟡 Tier 4 — Shopping Backend *(build order: 4th)*
 
 > **Prerequisite:** Tier 2 complete (users and JWT auth exist). ✅
 > **Note:** Frontend (Tier 3) is built AFTER this tier, not before.
 > The core commercial flow — basket through payment, all as REST APIs.
 
-> ⚠️ **Open Questions to resolve BEFORE writing specs:**
-> - FEAT-06: Can a guest add to basket? Must they log in to checkout? (§5.3, Q8–9)
+> ⚠️ **Open Questions to resolve BEFORE writing specs for remaining features:**
 > - FEAT-07: Multiple addresses? How is delivery date calculated? Delivery charges? (§20, Q15–17)
 > - FEAT-08: Is payment simulated or real gateway? What happens on failure? (§20, Q18–21)
 > - FEAT-09: How are gift points earned? What is their value? Do they expire? (§20, Q22–26)
 
 ---
 
-### [ ] FEAT-06 — Shopping Basket
+### [x] FEAT-06 — Shopping Basket
 
 | Field | Value |
 |---|---|
-| **Status** | 🔲 Not Started |
+| **Status** | ✅ Complete |
+| **Spec** | [docs/specs/feature-06-shopping-basket.md](specs/feature-06-shopping-basket.md) |
+| **Plan** | [docs/plans/feature-06-shopping-basket-plan.md](plans/feature-06-shopping-basket-plan.md) |
+| **Design** | [docs/designs/feature-06-shopping-basket-design.md](designs/feature-06-shopping-basket-design.md) |
 | **Business Requirements** | §10.1, §10.2, §10.3, BR-005 |
-| **Depends On** | FEAT-04 (user), FEAT-05 (frontend) |
+| **Depends On** | FEAT-04 (user) |
 | **Blocks** | FEAT-07 (checkout), FEAT-08 (payment) |
 
-**What it will deliver:**
-- Add a book to the basket
-- View basket contents (title, price, quantity, subtotal)
-- Update quantity / remove item from basket
-- Basket total calculation
-- Basket persists across sessions for registered users
+**What it delivers:**
+- Guest and authenticated basket via session cookie / JWT
+- Add, update quantity, remove item, clear basket
+- Per-book max quantity of 7 enforced; out-of-stock guard
+- Basket total and per-line totals computed server-side
+- Basket persists across requests for registered users (DB-backed)
 
 **Lifecycle checklist:**
-- [ ] Guest basket open question resolved
-- [ ] Spec written and approved
-- [ ] Plan written and approved
-- [ ] Design written and approved
-- [ ] Code complete
-- [ ] Tests passing
+- [x] Guest basket open question resolved
+- [x] Spec written and approved
+- [x] Plan written and approved
+- [x] Design written and approved
+- [x] Code complete
+- [x] Tests passing (27 new tests — 91 total, 0 failures)
 
 ---
 
