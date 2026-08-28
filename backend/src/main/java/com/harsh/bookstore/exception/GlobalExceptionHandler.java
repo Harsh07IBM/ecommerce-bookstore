@@ -11,6 +11,10 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+// FEAT-08 exception types
+import com.harsh.bookstore.exception.InsufficientStockException;
+import com.harsh.bookstore.exception.PaymentDeclinedException;
+
 
 
 /**
@@ -64,6 +68,46 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+
+    // ==================================================================
+    // FEAT-08 handlers
+    // ==================================================================
+
+    /**
+     * 402 Payment Required — the supplied card number is the simulated-decline sentinel.
+     * Thrown by OrderService.placeOrder() when cardNumber equals "0000000000000000" (BR-10).
+     */
+    @ExceptionHandler(PaymentDeclinedException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentDeclined(
+            PaymentDeclinedException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            402,
+            "Payment Required",
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(402).body(body);
+    }
+
+
+    /**
+     * 400 Bad Request — a basket item has insufficient stock at payment time.
+     * Thrown by OrderService.placeOrder() before any stock decrement is applied (BR-14).
+     */
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientStock(
+            InsufficientStockException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
 
 
     // ==================================================================
