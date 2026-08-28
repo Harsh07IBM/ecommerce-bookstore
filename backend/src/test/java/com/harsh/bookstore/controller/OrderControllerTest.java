@@ -2,6 +2,7 @@ package com.harsh.bookstore.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.harsh.bookstore.config.SecurityConfig;
+import com.harsh.bookstore.dto.BasketResponse;
 import com.harsh.bookstore.dto.OrderAddressSnapshot;
 import com.harsh.bookstore.dto.OrderItemResponse;
 import com.harsh.bookstore.dto.OrderResponse;
@@ -397,6 +398,52 @@ class OrderControllerTest {
                 .thenThrow(new OrderNotFoundException());
 
         mockMvc.perform(get("/api/orders/99")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Order not found"));
+    }
+
+
+    // ==================================================================
+    // FEAT-11 — POST /api/orders/{id}/buy-again
+    // ==================================================================
+
+    @Test
+    void buyAgain_returns200() throws Exception {
+        BasketResponse basket = new BasketResponse();
+        basket.setItems(List.of());
+        basket.setTotalItems(0);
+        basket.setBasketTotal(java.math.BigDecimal.ZERO);
+        when(orderService.buyAgain(eq(1L), eq(42L))).thenReturn(basket);
+
+        mockMvc.perform(post("/api/orders/42/buy-again")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(0));
+    }
+
+    @Test
+    void buyAgain_returns401_noJwt() throws Exception {
+        mockMvc.perform(post("/api/orders/42/buy-again"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void buyAgain_returns403_wrongOwner() throws Exception {
+        when(orderService.buyAgain(eq(1L), eq(42L)))
+                .thenThrow(new OrderAccessForbiddenException());
+
+        mockMvc.perform(post("/api/orders/42/buy-again")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void buyAgain_returns404_notFound() throws Exception {
+        when(orderService.buyAgain(eq(1L), eq(99L)))
+                .thenThrow(new OrderNotFoundException());
+
+        mockMvc.perform(post("/api/orders/99/buy-again")
                         .with(authentication(userAuth())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Order not found"));

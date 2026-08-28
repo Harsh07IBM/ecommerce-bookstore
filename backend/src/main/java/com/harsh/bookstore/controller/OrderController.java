@@ -1,5 +1,6 @@
 package com.harsh.bookstore.controller;
 
+import com.harsh.bookstore.dto.BasketResponse;
 import com.harsh.bookstore.dto.OrderResponse;
 import com.harsh.bookstore.dto.PaymentRequest;
 import com.harsh.bookstore.entity.User;
@@ -68,6 +69,21 @@ public class OrderController {
                                   Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         return orderService.getOrderById(user.getId(), id);
+    }
+
+
+    /**
+     * Re-add all items from a previous order to the current basket.
+     *
+     * @param id             the order ID from the path
+     * @param authentication Spring Security principal — always non-null (JWT required)
+     * @return 200 with updated BasketResponse
+     */
+    @PostMapping("/{id}/buy-again")
+    public BasketResponse buyAgain(@PathVariable Long id,
+                                   Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return orderService.buyAgain(user.getId(), id);
     }
 
 

@@ -15,8 +15,10 @@ import com.harsh.bookstore.exception.AddressNotFoundException;
 import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
 import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.InsufficientStockException;
+import com.harsh.bookstore.exception.MaxQuantityExceededException;
 import com.harsh.bookstore.exception.OrderAccessForbiddenException;
 import com.harsh.bookstore.exception.OrderNotFoundException;
+import com.harsh.bookstore.exception.OutOfStockException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
 import com.harsh.bookstore.repository.BookRepository;
 import com.harsh.bookstore.repository.DeliveryAddressRepository;
@@ -38,6 +40,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -532,6 +535,87 @@ class OrderServiceTest {
         when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> orderService.getOrderById(USER_ID, 42L))
+                .isInstanceOf(OrderAccessForbiddenException.class);
+    }
+
+
+    // ==================================================================
+    // FEAT-11 — buyAgain TESTS
+    // ==================================================================
+
+    private Order orderWithItem(Long orderId, Long userId, Long bookId) {
+        OrderItem oi = new OrderItem();
+        oi.setBookId(bookId);
+        oi.setTitle("Clean Code");
+        oi.setQuantity(2);
+        oi.setUnitPrice(new BigDecimal("299.00"));
+        oi.setLineTotal(new BigDecimal("598.00"));
+
+        Order o = buildSavedOrder(orderId, userId, java.time.LocalDateTime.now());
+        o.setItems(new java.util.ArrayList<>(List.of(oi)));
+        return o;
+    }
+
+    @Test
+    void buyAgain_addsAvailableItemsToBasket() {
+        Order order = orderWithItem(42L, USER_ID, BOOK_ID);
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+        BasketResponse expectedBasket = basketWith(new BigDecimal("299.00"), 1);
+        when(basketService.addItem(eq(USER_ID), eq(null), any()))
+                .thenReturn(expectedBasket);
+        when(basketService.getBasket(USER_ID, null)).thenReturn(expectedBasket);
+
+        BasketResponse result = orderService.buyAgain(USER_ID, 42L);
+
+        verify(basketService).addItem(eq(USER_ID), eq(null), any());
+        assertThat(result).isEqualTo(expectedBasket);
+    }
+
+    @Test
+    void buyAgain_skipsOutOfStockItems() {
+        Order order = orderWithItem(42L, USER_ID, BOOK_ID);
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+        when(basketService.addItem(eq(USER_ID), eq(null), any()))
+                .thenThrow(new OutOfStockException());
+        BasketResponse emptyBasket = new BasketResponse();
+        emptyBasket.setItems(List.of());
+        emptyBasket.setBasketTotal(java.math.BigDecimal.ZERO);
+        when(basketService.getBasket(USER_ID, null)).thenReturn(emptyBasket);
+
+        BasketResponse result = orderService.buyAgain(USER_ID, 42L);
+
+        // no exception thrown — silently skipped
+        assertThat(result.getItems()).isEmpty();
+    }
+
+    @Test
+    void buyAgain_skipsMaxQuantityItems() {
+        Order order = orderWithItem(42L, USER_ID, BOOK_ID);
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+        when(basketService.addItem(eq(USER_ID), eq(null), any()))
+                .thenThrow(new MaxQuantityExceededException());
+        BasketResponse existingBasket = basketWith(new BigDecimal("299.00"), 7);
+        when(basketService.getBasket(USER_ID, null)).thenReturn(existingBasket);
+
+        BasketResponse result = orderService.buyAgain(USER_ID, 42L);
+
+        assertThat(result).isEqualTo(existingBasket);
+    }
+
+    @Test
+    void buyAgain_throws404_orderNotFound() {
+        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.buyAgain(USER_ID, 99L))
+                .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    @Test
+    void buyAgain_throws403_wrongOwner() {
+        Order order = orderWithItem(42L, 999L, BOOK_ID);
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.buyAgain(USER_ID, 42L))
                 .isInstanceOf(OrderAccessForbiddenException.class);
     }
 }

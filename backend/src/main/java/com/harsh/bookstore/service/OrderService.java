@@ -1,5 +1,6 @@
 package com.harsh.bookstore.service;
 
+import com.harsh.bookstore.dto.AddItemRequest;
 import com.harsh.bookstore.dto.BasketItemDto;
 import com.harsh.bookstore.dto.BasketResponse;
 import com.harsh.bookstore.dto.OrderAddressSnapshot;
@@ -18,8 +19,10 @@ import com.harsh.bookstore.exception.BookNotFoundException;
 import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
 import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.InsufficientStockException;
+import com.harsh.bookstore.exception.MaxQuantityExceededException;
 import com.harsh.bookstore.exception.OrderAccessForbiddenException;
 import com.harsh.bookstore.exception.OrderNotFoundException;
+import com.harsh.bookstore.exception.OutOfStockException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
 import com.harsh.bookstore.repository.BookRepository;
 import com.harsh.bookstore.repository.DeliveryAddressRepository;
@@ -127,6 +130,36 @@ public class OrderService {
             throw new OrderAccessForbiddenException();
         }
         return toResponse(order);
+    }
+
+
+    /**
+     * Re-add all items from a previous order to the current basket (FEAT-11).
+     * Items that are out of stock, exceed max quantity, or no longer exist are silently skipped.
+     *
+     * @param userId  the authenticated user's ID
+     * @param orderId the order to re-purchase
+     * @return the updated basket after adding available items
+     * @throws OrderNotFoundException        if the order does not exist
+     * @throws OrderAccessForbiddenException if the order belongs to another user
+     */
+    public BasketResponse buyAgain(Long userId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(OrderNotFoundException::new);
+        if (!order.getUserId().equals(userId)) {
+            throw new OrderAccessForbiddenException();
+        }
+        for (OrderItem item : order.getItems()) {
+            try {
+                AddItemRequest req = new AddItemRequest();
+                req.setBookId(item.getBookId());
+                req.setQuantity(1);
+                basketService.addItem(userId, null, req);
+            } catch (OutOfStockException | MaxQuantityExceededException | BookNotFoundException e) {
+                // skip silently — spec BR-05, BR-06, BR-07
+            }
+        }
+        return basketService.getBasket(userId, null);
     }
 
 
