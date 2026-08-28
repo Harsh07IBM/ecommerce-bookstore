@@ -29,7 +29,7 @@
 | 1 | ✅ Tier 0 | Foundation | FEAT-01 | Complete |
 | 2 | ✅ Tier 1 | Catalogue Completion | FEAT-02, FEAT-03 | Complete |
 | 3 | ✅ Tier 2 | User Identity | FEAT-04 | Complete |
-| 4 | 🟡 Tier 4 | Shopping Backend | FEAT-06, FEAT-07, FEAT-08, FEAT-09 | **In Progress (1/4)** |
+| 4 | 🟡 Tier 4 | Shopping Backend | FEAT-06, FEAT-07, FEAT-08, FEAT-09 | **In Progress (2/4)** |
 | 5 | ⚫ Tier 5 | Post-Purchase Backend | FEAT-10, FEAT-11, FEAT-12, FEAT-13 | Not Started |
 | 6 | 🟣 Tier 6 | Intelligence Backend | FEAT-14, FEAT-15 | Not Started |
 | 7 | 🟠 Tier 3 | Storefront Frontend | FEAT-05 | Not Started — built last |
@@ -245,7 +245,6 @@
 > The core commercial flow — basket through payment, all as REST APIs.
 
 > ⚠️ **Open Questions to resolve BEFORE writing specs for remaining features:**
-> - FEAT-07: Multiple addresses? How is delivery date calculated? Delivery charges? (§20, Q15–17)
 > - FEAT-08: Is payment simulated or real gateway? What happens on failure? (§20, Q18–21)
 > - FEAT-09: How are gift points earned? What is their value? Do they expire? (§20, Q22–26)
 
@@ -280,29 +279,35 @@
 
 ---
 
-### [ ] FEAT-07 — Checkout & Delivery Address
+### [x] FEAT-07 — Checkout & Delivery Address
 
 | Field | Value |
 |---|---|
-| **Status** | 🔲 Not Started |
+| **Status** | ✅ Complete |
+| **Spec** | [docs/specs/feature-07-checkout-delivery.md](specs/feature-07-checkout-delivery.md) |
+| **Plan** | [docs/plans/feature-07-checkout-delivery-plan.md](plans/feature-07-checkout-delivery-plan.md) |
+| **Design** | [docs/designs/feature-07-checkout-delivery-design.md](designs/feature-07-checkout-delivery-design.md) |
 | **Business Requirements** | §12.1, §12.2, BR-009 |
 | **Depends On** | FEAT-06 (basket) |
 | **Blocks** | FEAT-08 (payment) |
 
-**What it will deliver:**
-- Delivery address entry during checkout
-- Tentative delivery date display on product / checkout
-- Optional: save and select from multiple addresses
+**What it delivers:**
+- Multiple saved delivery addresses per user (add, update, delete)
+- Default address management with auto-demotion (BR-04)
+- Ownership enforced — users cannot access each other's addresses (403)
+- Checkout summary: basket items + chosen address + delivery charge + estimated delivery date
+- Delivery charge: free above ₹500, ₹50 below (BR-10)
+- Estimated delivery: today + 3 calendar days, ISO-8601 (BR-11)
 
 **Lifecycle checklist:**
-- [ ] Multiple addresses open question resolved
-- [ ] Delivery date calculation rule decided
-- [ ] Delivery charges decision made
-- [ ] Spec written and approved
-- [ ] Plan written and approved
-- [ ] Design written and approved
-- [ ] Code complete
-- [ ] Tests passing
+- [x] Multiple addresses open question resolved (Q17 — multiple saved addresses supported)
+- [x] Delivery date calculation rule decided (Q15 — today + 3 calendar days)
+- [x] Delivery charges decision made (Q16 — free ≥ ₹500, ₹50 below)
+- [x] Spec written and approved
+- [x] Plan written and approved
+- [x] Design written and approved
+- [x] Code complete
+- [x] Tests passing (44 new tests — 135 total, 0 failures)
 
 ---
 
