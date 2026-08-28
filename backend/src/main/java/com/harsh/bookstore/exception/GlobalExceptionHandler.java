@@ -66,6 +66,65 @@ public class GlobalExceptionHandler {
 
 
     // ==================================================================
+    // FEAT-06 handlers
+    // ==================================================================
+
+    /**
+     * 404 Not Found — the caller tried to update/remove a book that is
+     * not in their basket.
+     * Thrown by BasketService.updateItem() and BasketService.removeItem().
+     */
+    @ExceptionHandler(BasketItemNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleBasketItemNotFound(
+            BasketItemNotFoundException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.NOT_FOUND.value(),
+            HttpStatus.NOT_FOUND.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+
+    /**
+     * 400 Bad Request — the book is out of stock.
+     * Thrown by BasketService.addItem() when stockQuantity == 0 (BR-04).
+     */
+    @ExceptionHandler(OutOfStockException.class)
+    public ResponseEntity<ErrorResponse> handleOutOfStock(
+            OutOfStockException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+
+    /**
+     * 400 Bad Request — adding the book would push its basket quantity above 7.
+     * Thrown by BasketService.addItem() when existing + new > 7 (BR-05).
+     */
+    @ExceptionHandler(MaxQuantityExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxQuantityExceeded(
+            MaxQuantityExceededException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+
+    // ==================================================================
     // FEAT-04 handlers
     // ==================================================================
 

@@ -49,12 +49,13 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  *   nothing for a CSRF attack to exploit. Disabling CSRF is the correct and
  *   standard choice for stateless REST APIs.
  *
- * WHY SESSION IS STATELESS:
- *   We don't store any session state on the server. Each request is
- *   self-contained — the JWT carries all identity information. Setting
- *   STATELESS tells Spring Security to never create or look up an HttpSession,
- *   which saves memory and makes the app horizontally scalable (any server
- *   can handle any request — they don't need shared session storage).
+ * WHY SESSION IS IF_REQUIRED (changed from STATELESS in FEAT-06):
+ *   FEAT-06 (Shopping Basket) requires a session cookie to identify guest
+ *   visitors. IF_REQUIRED tells Spring to create an HttpSession only when
+ *   one is actually needed — i.e. the first time a guest calls a basket
+ *   endpoint. Authenticated requests still carry a JWT and will not create
+ *   a session. This is the minimal change that supports guest baskets while
+ *   keeping JWT-only endpoints effectively stateless.
  */
 @Configuration
 @EnableWebSecurity
@@ -96,9 +97,10 @@ public class SecurityConfig {
             // Disable CSRF — JWT in Authorization header, no cookies (see class Javadoc)
             .csrf(csrf -> csrf.disable())
 
-            // No server-side sessions — pure stateless JWT (see class Javadoc)
+            // Create sessions only when needed (guest basket support — FEAT-06).
+            // See class Javadoc for the rationale.
             .sessionManagement(sm ->
-                    sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                    sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
 
             // Permit/deny rules
             .authorizeHttpRequests(auth -> auth
@@ -109,7 +111,9 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                     // H2 console — dev only, allow all methods on this path
                     .requestMatchers("/h2-console/**").permitAll()
-                    // Every other endpoint (basket, orders, etc.) requires a valid JWT
+                    // Basket endpoints are open to guests and authenticated users (FEAT-06)
+                    .requestMatchers("/api/basket/**").permitAll()
+                    // Every other endpoint (orders, etc.) requires a valid JWT
                     .anyRequest().authenticated()
             )
 
