@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -63,6 +64,64 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+
+    // ==================================================================
+    // FEAT-07 handlers
+    // ==================================================================
+
+    /**
+     * 404 Not Found — the requested address does not exist.
+     * Thrown by AddressService and CheckoutService.
+     */
+    @ExceptionHandler(AddressNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleAddressNotFound(
+            AddressNotFoundException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.NOT_FOUND.value(),
+            HttpStatus.NOT_FOUND.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+
+    /**
+     * 403 Forbidden — address belongs to a different user.
+     * Thrown by AddressService and CheckoutService when ownership check fails.
+     */
+    @ExceptionHandler(AddressAccessForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleAddressAccessForbidden(
+            AddressAccessForbiddenException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.FORBIDDEN.value(),
+            HttpStatus.FORBIDDEN.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+
+    /**
+     * 400 Bad Request — attempting to delete the default address while others exist.
+     * Thrown by AddressService.deleteAddress() when BR-08 is violated.
+     */
+    @ExceptionHandler(DefaultAddressDeleteException.class)
+    public ResponseEntity<ErrorResponse> handleDefaultAddressDelete(
+            DefaultAddressDeleteException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
 
 
     // ==================================================================
@@ -241,6 +300,25 @@ public class GlobalExceptionHandler {
             request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+
+    /**
+     * 400 Bad Request — a required @RequestParam is missing from the query string.
+     * Spring MVC throws MissingServletRequestParameterException before the handler
+     * method is invoked. Without this explicit handler it falls through to the 500 catch-all.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParam(
+            MissingServletRequestParameterException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
 

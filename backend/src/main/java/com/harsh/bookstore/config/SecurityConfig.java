@@ -3,6 +3,7 @@ package com.harsh.bookstore.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -10,6 +11,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 
@@ -123,6 +125,14 @@ public class SecurityConfig {
             // Safe because the console is only accessible on localhost.
             .headers(headers ->
                     headers.frameOptions(fo -> fo.disable()))
+
+            // Return 401 (not 403) for requests that reach a protected endpoint
+            // without any authentication. Without this, Spring Security defaults
+            // to 403 for unauthenticated requests (it treats "no credentials" the
+            // same as "wrong credentials" at the AccessDeniedHandler level).
+            .exceptionHandling(ex ->
+                    ex.authenticationEntryPoint(
+                            new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
 
             // Insert our JWT filter before Spring's own credential filter.
             // Spring Security auto-discovers UserService as the UserDetailsService
