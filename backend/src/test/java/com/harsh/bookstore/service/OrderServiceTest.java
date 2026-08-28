@@ -15,6 +15,8 @@ import com.harsh.bookstore.exception.AddressNotFoundException;
 import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
 import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.InsufficientStockException;
+import com.harsh.bookstore.exception.OrderAccessForbiddenException;
+import com.harsh.bookstore.exception.OrderNotFoundException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
 import com.harsh.bookstore.repository.BookRepository;
 import com.harsh.bookstore.repository.DeliveryAddressRepository;
@@ -451,5 +453,85 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.placeOrder(USER_ID, req))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("expiryYear");
+    }
+
+
+    // ==================================================================
+    // FEAT-10 — getOrders / getOrderById TESTS
+    // ==================================================================
+
+    private Order buildSavedOrder(Long orderId, Long userId, java.time.LocalDateTime orderDate) {
+        Order o = new Order();
+        o.setId(orderId);
+        o.setUserId(userId);
+        o.setStatus(OrderStatus.PAID);
+        o.setOrderDate(orderDate);
+        o.setBasketTotal(new BigDecimal("600.00"));
+        o.setDeliveryCharge(BigDecimal.ZERO);
+        o.setGiftPointsRedeemed(0);
+        o.setTotalAmount(new BigDecimal("600.00"));
+        o.setPointsAwarded(30);
+        o.setEstimatedDeliveryDate("2025-09-01");
+        o.setRecipientName("Test User");
+        o.setPhoneNumber("9876543210");
+        o.setLine1("1 Main St");
+        o.setCity("Mumbai");
+        o.setState("Maharashtra");
+        o.setPincode("400001");
+        o.setItems(new java.util.ArrayList<>());
+        return o;
+    }
+
+    @Test
+    void getOrders_returnsSortedByDateDesc() {
+        java.time.LocalDateTime older = java.time.LocalDateTime.now().minusDays(2);
+        java.time.LocalDateTime newer = java.time.LocalDateTime.now().minusDays(1);
+        Order o1 = buildSavedOrder(1L, USER_ID, older);
+        Order o2 = buildSavedOrder(2L, USER_ID, newer);
+        when(orderRepository.findAllByUserId(USER_ID)).thenReturn(List.of(o1, o2));
+
+        List<OrderResponse> result = orderService.getOrders(USER_ID);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getOrderId()).isEqualTo(2L); // newer first
+        assertThat(result.get(1).getOrderId()).isEqualTo(1L);
+    }
+
+    @Test
+    void getOrders_returnsEmpty_whenNone() {
+        when(orderRepository.findAllByUserId(USER_ID)).thenReturn(List.of());
+
+        List<OrderResponse> result = orderService.getOrders(USER_ID);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void getOrderById_returnsOrder() {
+        Order order = buildSavedOrder(42L, USER_ID, java.time.LocalDateTime.now());
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+
+        OrderResponse result = orderService.getOrderById(USER_ID, 42L);
+
+        assertThat(result.getOrderId()).isEqualTo(42L);
+        assertThat(result.getStatus()).isEqualTo("PAID");
+    }
+
+    @Test
+    void getOrderById_throws404_whenNotFound() {
+        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.getOrderById(USER_ID, 99L))
+                .isInstanceOf(OrderNotFoundException.class)
+                .hasMessage("Order not found");
+    }
+
+    @Test
+    void getOrderById_throws403_whenWrongOwner() {
+        Order order = buildSavedOrder(42L, 999L, java.time.LocalDateTime.now()); // owned by 999
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.getOrderById(USER_ID, 42L))
+                .isInstanceOf(OrderAccessForbiddenException.class);
     }
 }

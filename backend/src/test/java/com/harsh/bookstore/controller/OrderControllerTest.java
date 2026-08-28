@@ -12,6 +12,8 @@ import com.harsh.bookstore.exception.AddressNotFoundException;
 import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
 import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.InsufficientStockException;
+import com.harsh.bookstore.exception.OrderAccessForbiddenException;
+import com.harsh.bookstore.exception.OrderNotFoundException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
 import com.harsh.bookstore.repository.UserRepository;
 import com.harsh.bookstore.service.JwtService;
@@ -35,6 +37,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -327,5 +330,75 @@ class OrderControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest())))
                 .andExpect(status().isNotFound());
+    }
+
+
+    // ==================================================================
+    // FEAT-10 — GET /api/orders and GET /api/orders/{id}
+    // ==================================================================
+
+    @Test
+    void listOrders_returns200() throws Exception {
+        when(orderService.getOrders(1L)).thenReturn(List.of(paidResponse()));
+
+        mockMvc.perform(get("/api/orders")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].orderId").value(42));
+    }
+
+    @Test
+    void listOrders_returns200_empty() throws Exception {
+        when(orderService.getOrders(1L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/orders")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void listOrders_returns401_noJwt() throws Exception {
+        mockMvc.perform(get("/api/orders"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getOrder_returns200() throws Exception {
+        when(orderService.getOrderById(1L, 42L)).thenReturn(paidResponse());
+
+        mockMvc.perform(get("/api/orders/42")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value(42))
+                .andExpect(jsonPath("$.status").value("PAID"));
+    }
+
+    @Test
+    void getOrder_returns401_noJwt() throws Exception {
+        mockMvc.perform(get("/api/orders/42"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getOrder_returns403_wrongOwner() throws Exception {
+        when(orderService.getOrderById(eq(1L), eq(42L)))
+                .thenThrow(new OrderAccessForbiddenException());
+
+        mockMvc.perform(get("/api/orders/42")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getOrder_returns404_notFound() throws Exception {
+        when(orderService.getOrderById(eq(1L), eq(99L)))
+                .thenThrow(new OrderNotFoundException());
+
+        mockMvc.perform(get("/api/orders/99")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Order not found"));
     }
 }

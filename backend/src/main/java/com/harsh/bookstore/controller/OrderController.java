@@ -9,11 +9,15 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 
 /**
@@ -36,6 +40,34 @@ public class OrderController {
 
     public OrderController(OrderService orderService) {
         this.orderService = orderService;
+    }
+
+
+    /**
+     * List all orders for the authenticated user, newest first.
+     *
+     * @param authentication Spring Security principal — always non-null (JWT required)
+     * @return 200 with list of OrderResponse (empty array if none)
+     */
+    @GetMapping
+    public List<OrderResponse> listOrders(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return orderService.getOrders(user.getId());
+    }
+
+
+    /**
+     * Get a single order by ID.
+     *
+     * @param id             the order ID from the path
+     * @param authentication Spring Security principal — always non-null (JWT required)
+     * @return 200 with OrderResponse; 403 if wrong owner; 404 if not found
+     */
+    @GetMapping("/{id}")
+    public OrderResponse getOrder(@PathVariable Long id,
+                                  Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return orderService.getOrderById(user.getId(), id);
     }
 
 

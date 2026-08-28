@@ -18,6 +18,8 @@ import com.harsh.bookstore.exception.BookNotFoundException;
 import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
 import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.InsufficientStockException;
+import com.harsh.bookstore.exception.OrderAccessForbiddenException;
+import com.harsh.bookstore.exception.OrderNotFoundException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
 import com.harsh.bookstore.repository.BookRepository;
 import com.harsh.bookstore.repository.DeliveryAddressRepository;
@@ -31,6 +33,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 
@@ -92,6 +95,40 @@ public class OrderService {
     // ==================================================================
     // PUBLIC API
     // ==================================================================
+
+    /**
+     * Return all orders for the authenticated user, sorted newest first (FEAT-10).
+     *
+     * @param userId the authenticated user's ID
+     * @return list of OrderResponse sorted by orderDate descending; empty list if none
+     */
+    public List<OrderResponse> getOrders(Long userId) {
+        return orderRepository.findAllByUserId(userId)
+                .stream()
+                .sorted(Comparator.comparing(Order::getOrderDate).reversed())
+                .map(this::toResponse)
+                .toList();
+    }
+
+
+    /**
+     * Return a single order by ID with ownership check (FEAT-10).
+     *
+     * @param userId  the authenticated user's ID
+     * @param orderId the order to retrieve
+     * @return OrderResponse if the order belongs to the user
+     * @throws OrderNotFoundException          if no order with orderId exists
+     * @throws OrderAccessForbiddenException   if the order belongs to another user
+     */
+    public OrderResponse getOrderById(Long userId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(OrderNotFoundException::new);
+        if (!order.getUserId().equals(userId)) {
+            throw new OrderAccessForbiddenException();
+        }
+        return toResponse(order);
+    }
+
 
     /**
      * Validate, charge, and create an order for the authenticated user.

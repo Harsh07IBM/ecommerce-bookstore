@@ -19,6 +19,10 @@ import com.harsh.bookstore.exception.PaymentDeclinedException;
 import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
 import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 
+// FEAT-10 exception types
+import com.harsh.bookstore.exception.OrderAccessForbiddenException;
+import com.harsh.bookstore.exception.OrderNotFoundException;
+
 
 
 /**
@@ -72,6 +76,46 @@ import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+
+    // ==================================================================
+    // FEAT-10 handlers
+    // ==================================================================
+
+    /**
+     * 404 Not Found — the requested order does not exist.
+     * Thrown by OrderService.getOrderById() (spec BR-03).
+     */
+    @ExceptionHandler(OrderNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleOrderNotFound(
+            OrderNotFoundException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.NOT_FOUND.value(),
+            HttpStatus.NOT_FOUND.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+
+    /**
+     * 403 Forbidden — the order belongs to a different user.
+     * Thrown by OrderService.getOrderById() (spec BR-02).
+     */
+    @ExceptionHandler(OrderAccessForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleOrderAccessForbidden(
+            OrderAccessForbiddenException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.FORBIDDEN.value(),
+            HttpStatus.FORBIDDEN.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
 
 
     // ==================================================================
