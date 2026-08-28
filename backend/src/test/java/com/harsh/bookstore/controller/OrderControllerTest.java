@@ -10,10 +10,12 @@ import com.harsh.bookstore.dto.PaymentRequest;
 import com.harsh.bookstore.entity.User;
 import com.harsh.bookstore.exception.AddressAccessForbiddenException;
 import com.harsh.bookstore.exception.AddressNotFoundException;
+import com.harsh.bookstore.exception.CancellationWindowExpiredException;
 import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
 import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.InsufficientStockException;
 import com.harsh.bookstore.exception.OrderAccessForbiddenException;
+import com.harsh.bookstore.exception.OrderNotCancellableException;
 import com.harsh.bookstore.exception.OrderNotFoundException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
 import com.harsh.bookstore.repository.UserRepository;
@@ -444,6 +446,72 @@ class OrderControllerTest {
                 .thenThrow(new OrderNotFoundException());
 
         mockMvc.perform(post("/api/orders/99/buy-again")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Order not found"));
+    }
+
+
+    // ==================================================================
+    // FEAT-12 — POST /api/orders/{id}/cancel
+    // ==================================================================
+
+    @Test
+    void cancelOrder_returns200() throws Exception {
+        OrderResponse cancelled = paidResponse();
+        cancelled.setStatus("CANCELLED");
+        when(orderService.cancelOrder(eq(1L), eq(42L))).thenReturn(cancelled);
+
+        mockMvc.perform(post("/api/orders/42/cancel")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void cancelOrder_returns401_noJwt() throws Exception {
+        mockMvc.perform(post("/api/orders/42/cancel"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void cancelOrder_returns400_notCancellable() throws Exception {
+        when(orderService.cancelOrder(eq(1L), eq(42L)))
+                .thenThrow(new OrderNotCancellableException());
+
+        mockMvc.perform(post("/api/orders/42/cancel")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Order cannot be cancelled"));
+    }
+
+    @Test
+    void cancelOrder_returns400_windowExpired() throws Exception {
+        when(orderService.cancelOrder(eq(1L), eq(42L)))
+                .thenThrow(new CancellationWindowExpiredException());
+
+        mockMvc.perform(post("/api/orders/42/cancel")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Cancellation window has expired"));
+    }
+
+    @Test
+    void cancelOrder_returns403_wrongOwner() throws Exception {
+        when(orderService.cancelOrder(eq(1L), eq(42L)))
+                .thenThrow(new OrderAccessForbiddenException());
+
+        mockMvc.perform(post("/api/orders/42/cancel")
+                        .with(authentication(userAuth())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cancelOrder_returns404_notFound() throws Exception {
+        when(orderService.cancelOrder(eq(1L), eq(99L)))
+                .thenThrow(new OrderNotFoundException());
+
+        mockMvc.perform(post("/api/orders/99/cancel")
                         .with(authentication(userAuth())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Order not found"));

@@ -23,6 +23,10 @@ import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.OrderAccessForbiddenException;
 import com.harsh.bookstore.exception.OrderNotFoundException;
 
+// FEAT-12 exception types
+import com.harsh.bookstore.exception.CancellationWindowExpiredException;
+import com.harsh.bookstore.exception.OrderNotCancellableException;
+
 
 
 /**
@@ -76,6 +80,46 @@ import com.harsh.bookstore.exception.OrderNotFoundException;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+
+    // ==================================================================
+    // FEAT-12 handlers
+    // ==================================================================
+
+    /**
+     * 400 Bad Request — order status is not PAID.
+     * Thrown by OrderService.cancelOrder() (spec BR-04).
+     */
+    @ExceptionHandler(OrderNotCancellableException.class)
+    public ResponseEntity<ErrorResponse> handleOrderNotCancellable(
+            OrderNotCancellableException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+
+    /**
+     * 400 Bad Request — more than 48 hours have passed since order was placed.
+     * Thrown by OrderService.cancelOrder() (spec BR-05).
+     */
+    @ExceptionHandler(CancellationWindowExpiredException.class)
+    public ResponseEntity<ErrorResponse> handleCancellationWindowExpired(
+            CancellationWindowExpiredException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
 
 
     // ==================================================================

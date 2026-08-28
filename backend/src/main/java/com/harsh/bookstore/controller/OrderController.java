@@ -73,6 +73,21 @@ public class OrderController {
 
 
     /**
+     * Cancel a PAID order within 48 hours of placement.
+     *
+     * @param id             the order ID from the path
+     * @param authentication Spring Security principal — always non-null (JWT required)
+     * @return 200 with updated OrderResponse (status = CANCELLED)
+     */
+    @PostMapping("/{id}/cancel")
+    public OrderResponse cancelOrder(@PathVariable Long id,
+                                     Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return orderService.cancelOrder(user.getId(), id);
+    }
+
+
+    /**
      * Re-add all items from a previous order to the current basket.
      *
      * @param id             the order ID from the path

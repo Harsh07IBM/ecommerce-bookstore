@@ -16,11 +16,13 @@ import com.harsh.bookstore.entity.User;
 import com.harsh.bookstore.exception.AddressAccessForbiddenException;
 import com.harsh.bookstore.exception.AddressNotFoundException;
 import com.harsh.bookstore.exception.BookNotFoundException;
+import com.harsh.bookstore.exception.CancellationWindowExpiredException;
 import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
 import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.InsufficientStockException;
 import com.harsh.bookstore.exception.MaxQuantityExceededException;
 import com.harsh.bookstore.exception.OrderAccessForbiddenException;
+import com.harsh.bookstore.exception.OrderNotCancellableException;
 import com.harsh.bookstore.exception.OrderNotFoundException;
 import com.harsh.bookstore.exception.OutOfStockException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
@@ -35,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -130,6 +134,49 @@ public class OrderService {
             throw new OrderAccessForbiddenException();
         }
         return toResponse(order);
+    }
+
+
+    /**
+     * Cancel a PAID order within 48 hours of placement (FEAT-12).
+     * Restores stock for each item; leaves gift points unchanged.
+     *
+     * @param userId  the authenticated user's ID
+     * @param orderId the order to cancel
+     * @return updated OrderResponse with status CANCELLED
+     * @throws OrderNotFoundException              if the order does not exist
+     * @throws OrderAccessForbiddenException       if the order belongs to another user
+     * @throws OrderNotCancellableException        if the order status is not PAID
+     * @throws CancellationWindowExpiredException  if more than 48 hours have passed
+     */
+    @Transactional
+    public OrderResponse cancelOrder(Long userId, Long orderId) {
+        // 1. load + ownership check
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(OrderNotFoundException::new);
+        if (!order.getUserId().equals(userId)) {
+            throw new OrderAccessForbiddenException();
+        }
+        // 2. status check (spec BR-04)
+        if (order.getStatus() != OrderStatus.PAID) {
+            throw new OrderNotCancellableException();
+        }
+        // 3. 48-hour window check (spec BR-05)
+        if (ChronoUnit.HOURS.between(order.getOrderDate(), LocalDateTime.now()) > 48) {
+            throw new CancellationWindowExpiredException();
+        }
+        // 4. restore stock (spec BR-07)
+        for (OrderItem item : order.getItems()) {
+            bookRepository.findById(item.getBookId()).ifPresent(book -> {
+                book.setStockQuantity(book.getStockQuantity() + item.getQuantity());
+                bookRepository.save(book);
+            });
+        }
+        // 5. update status and save
+        order.setStatus(OrderStatus.CANCELLED);
+        Order saved = orderRepository.save(order);
+        // 6. return updated response
+        return toResponse(saved);
     }
 
 

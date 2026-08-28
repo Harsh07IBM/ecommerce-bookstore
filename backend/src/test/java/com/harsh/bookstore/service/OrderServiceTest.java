@@ -12,11 +12,13 @@ import com.harsh.bookstore.entity.OrderStatus;
 import com.harsh.bookstore.entity.User;
 import com.harsh.bookstore.exception.AddressAccessForbiddenException;
 import com.harsh.bookstore.exception.AddressNotFoundException;
+import com.harsh.bookstore.exception.CancellationWindowExpiredException;
 import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
 import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.InsufficientStockException;
 import com.harsh.bookstore.exception.MaxQuantityExceededException;
 import com.harsh.bookstore.exception.OrderAccessForbiddenException;
+import com.harsh.bookstore.exception.OrderNotCancellableException;
 import com.harsh.bookstore.exception.OrderNotFoundException;
 import com.harsh.bookstore.exception.OutOfStockException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
@@ -617,5 +619,96 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> orderService.buyAgain(USER_ID, 42L))
                 .isInstanceOf(OrderAccessForbiddenException.class);
+    }
+
+
+    // ==================================================================
+    // FEAT-12 — cancelOrder TESTS
+    // ==================================================================
+
+    private Order paidOrderWithItem(Long orderId, Long userId, java.time.LocalDateTime orderDate) {
+        Order o = orderWithItem(orderId, userId, BOOK_ID);
+        o.setOrderDate(orderDate);
+        o.setStatus(OrderStatus.PAID);
+        return o;
+    }
+
+    @Test
+    void cancelOrder_success_statusCancelled() {
+        Order order = paidOrderWithItem(42L, USER_ID, java.time.LocalDateTime.now().minusHours(1));
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+        when(bookRepository.findById(BOOK_ID)).thenReturn(Optional.of(book(10)));
+        lenient().when(bookRepository.save(any(Book.class))).thenAnswer(i -> i.getArgument(0));
+        lenient().when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        OrderResponse result = orderService.cancelOrder(USER_ID, 42L);
+
+        assertThat(result.getStatus()).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void cancelOrder_success_stockRestored() {
+        OrderItem oi = new OrderItem();
+        oi.setBookId(BOOK_ID);
+        oi.setQuantity(3);
+        oi.setTitle("Clean Code");
+        oi.setUnitPrice(new BigDecimal("299.00"));
+        oi.setLineTotal(new BigDecimal("897.00"));
+
+        Order order = buildSavedOrder(42L, USER_ID, java.time.LocalDateTime.now().minusHours(1));
+        order.setStatus(OrderStatus.PAID);
+        order.setItems(new java.util.ArrayList<>(List.of(oi)));
+
+        Book mockBook = book(5); // stock = 5 before cancellation
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+        when(bookRepository.findById(BOOK_ID)).thenReturn(Optional.of(mockBook));
+        lenient().when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        ArgumentCaptor<Book> bookCaptor = ArgumentCaptor.forClass(Book.class);
+        when(bookRepository.save(any(Book.class))).thenAnswer(i -> i.getArgument(0));
+
+        orderService.cancelOrder(USER_ID, 42L);
+
+        verify(bookRepository).save(bookCaptor.capture());
+        assertThat(bookCaptor.getValue().getStockQuantity()).isEqualTo(8); // 5 + 3
+    }
+
+    @Test
+    void cancelOrder_throws404_orderNotFound() {
+        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.cancelOrder(USER_ID, 99L))
+                .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    @Test
+    void cancelOrder_throws403_wrongOwner() {
+        Order order = paidOrderWithItem(42L, 999L, java.time.LocalDateTime.now().minusHours(1));
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(USER_ID, 42L))
+                .isInstanceOf(OrderAccessForbiddenException.class);
+    }
+
+    @Test
+    void cancelOrder_throws400_notPaid() {
+        Order order = paidOrderWithItem(42L, USER_ID, java.time.LocalDateTime.now().minusHours(1));
+        order.setStatus(OrderStatus.CANCELLED);
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(USER_ID, 42L))
+                .isInstanceOf(OrderNotCancellableException.class)
+                .hasMessage("Order cannot be cancelled");
+    }
+
+    @Test
+    void cancelOrder_throws400_windowExpired() {
+        Order order = paidOrderWithItem(42L, USER_ID,
+                java.time.LocalDateTime.now().minusHours(49)); // 49h ago — expired
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(USER_ID, 42L))
+                .isInstanceOf(CancellationWindowExpiredException.class)
+                .hasMessage("Cancellation window has expired");
     }
 }
