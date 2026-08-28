@@ -108,6 +108,14 @@ public class Order {
     @Column(nullable = false, length = 6)
     private String pincode;
 
+    /** Points redeemed from the user's balance on this order (FEAT-09). Default 0. */
+    @Column(name = "gift_points_redeemed", nullable = false)
+    private int giftPointsRedeemed = 0;
+
+    /** Points awarded to the user's balance for this order (FEAT-09). Default 0. */
+    @Column(name = "points_awarded", nullable = false)
+    private int pointsAwarded = 0;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
@@ -180,6 +188,12 @@ public class Order {
 
     public String getPincode() { return pincode; }
     public void setPincode(String pincode) { this.pincode = pincode; }
+
+    public int getGiftPointsRedeemed() { return giftPointsRedeemed; }
+    public void setGiftPointsRedeemed(int giftPointsRedeemed) { this.giftPointsRedeemed = giftPointsRedeemed; }
+
+    public int getPointsAwarded() { return pointsAwarded; }
+    public void setPointsAwarded(int pointsAwarded) { this.pointsAwarded = pointsAwarded; }
 
     public List<OrderItem> getItems() { return items; }
     public void setItems(List<OrderItem> items) { this.items = items; }

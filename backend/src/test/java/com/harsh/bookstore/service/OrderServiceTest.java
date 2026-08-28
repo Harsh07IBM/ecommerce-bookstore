@@ -9,13 +9,17 @@ import com.harsh.bookstore.entity.DeliveryAddress;
 import com.harsh.bookstore.entity.Order;
 import com.harsh.bookstore.entity.OrderItem;
 import com.harsh.bookstore.entity.OrderStatus;
+import com.harsh.bookstore.entity.User;
 import com.harsh.bookstore.exception.AddressAccessForbiddenException;
 import com.harsh.bookstore.exception.AddressNotFoundException;
+import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
+import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.InsufficientStockException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
 import com.harsh.bookstore.repository.BookRepository;
 import com.harsh.bookstore.repository.DeliveryAddressRepository;
 import com.harsh.bookstore.repository.OrderRepository;
+import com.harsh.bookstore.repository.UserRepository;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +53,7 @@ class OrderServiceTest {
     @Mock private BasketService basketService;
     @Mock private DeliveryAddressRepository addressRepository;
     @Mock private BookRepository bookRepository;
+    @Mock private UserRepository userRepository;
 
     private OrderService orderService;
 
@@ -60,7 +65,8 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository, basketService, addressRepository, bookRepository);
+        orderService = new OrderService(
+                orderRepository, basketService, addressRepository, bookRepository, userRepository);
     }
 
 
@@ -116,23 +122,38 @@ class OrderServiceTest {
         return b;
     }
 
-    /** Stub the happy path: basket + address + book + save. */
+    private User userWithPoints(int points) {
+        User u = new User();
+        u.setId(USER_ID);
+        u.setEmail("test@example.com");
+        u.setFirstName("Test");
+        u.setLastName("User");
+        u.setPasswordHash("hash");
+        u.setGiftPoints(points);
+        return u;
+    }
+
+    /** Stub the happy path: basket + address + book + user + save. */
     private void stubHappyPath(BasketResponse basket) {
+        stubHappyPath(basket, 0);
+    }
+
+    private void stubHappyPath(BasketResponse basket, int userPoints) {
         when(basketService.getBasket(USER_ID, null)).thenReturn(basket);
         when(addressRepository.findById(ADDRESS_ID)).thenReturn(Optional.of(address(USER_ID)));
         when(bookRepository.findById(BOOK_ID)).thenReturn(Optional.of(book(10)));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(userWithPoints(userPoints)));
 
-        // stub save — capture what's passed in and return it with an id
         lenient().when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order o = invocation.getArgument(0);
             o.setId(42L);
-            // simulate @PrePersist
             if (o.getOrderDate() == null) {
                 o.setOrderDate(java.time.LocalDateTime.now());
             }
             return o;
         });
         lenient().when(basketService.clearBasket(USER_ID, null)).thenReturn(new BasketResponse());
+        lenient().when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
     }
 
 
@@ -235,7 +256,125 @@ class OrderServiceTest {
 
 
     // ==================================================================
-    // FAILURE TESTS
+    // GIFT POINTS SUCCESS TESTS
+    // ==================================================================
+
+    @Test
+    void placeOrder_zeroGiftPoints_awardsPointsOnly() {
+        // basketTotal=600, delivery=0, redeem=0 → total=600, points=floor(600*0.05)=30
+        BasketResponse basket = basketWith(new BigDecimal("600.00"), 1);
+        stubHappyPath(basket, 0);
+
+        OrderResponse response = orderService.placeOrder(USER_ID, validRequest());
+
+        assertThat(response.getGiftPointsRedeemed()).isEqualTo(0);
+        assertThat(response.getPointsAwarded()).isEqualTo(30);
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(new BigDecimal("600.00"));
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getGiftPoints()).isEqualTo(30); // 0 - 0 + 30
+    }
+
+    @Test
+    void placeOrder_giftPoints_totalAmountReduced() {
+        // basketTotal=600, delivery=0, redeem=50 → total=550
+        BasketResponse basket = basketWith(new BigDecimal("600.00"), 1);
+        stubHappyPath(basket, 100);
+
+        PaymentRequest req = validRequest();
+        req.setGiftPointsToRedeem(50);
+
+        OrderResponse response = orderService.placeOrder(USER_ID, req);
+
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(new BigDecimal("550.00"));
+    }
+
+    @Test
+    void placeOrder_giftPoints_pointsAwardedOnReducedTotal() {
+        // basketTotal=199, delivery=50, redeem=0 → total=249, points=floor(249*0.05)=12
+        BasketResponse basket = basketWith(new BigDecimal("199.00"), 1);
+        stubHappyPath(basket, 0);
+
+        OrderResponse response = orderService.placeOrder(USER_ID, validRequest());
+
+        assertThat(response.getPointsAwarded()).isEqualTo(12); // floor(249 * 0.05) = 12
+    }
+
+    @Test
+    void placeOrder_giftPoints_pointsAwardedFloor() {
+        // basketTotal=199, delivery=50, redeem=0 → total=249, points=12 (not 13)
+        BasketResponse basket = basketWith(new BigDecimal("199.00"), 1);
+        stubHappyPath(basket, 0);
+
+        OrderResponse response = orderService.placeOrder(USER_ID, validRequest());
+
+        // 249 * 0.05 = 12.45 → floor = 12
+        assertThat(response.getPointsAwarded()).isEqualTo(12);
+    }
+
+    @Test
+    void placeOrder_giftPoints_deductedAndAwarded() {
+        // basketTotal=600, delivery=0, redeem=50 → total=550, points=floor(550*0.05)=27
+        // user starts with 100 → ends with 100 - 50 + 27 = 77
+        BasketResponse basket = basketWith(new BigDecimal("600.00"), 1);
+        stubHappyPath(basket, 100);
+
+        PaymentRequest req = validRequest();
+        req.setGiftPointsToRedeem(50);
+
+        OrderResponse response = orderService.placeOrder(USER_ID, req);
+
+        assertThat(response.getGiftPointsRedeemed()).isEqualTo(50);
+        assertThat(response.getPointsAwarded()).isEqualTo(27); // floor(550 * 0.05)
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getGiftPoints()).isEqualTo(77); // 100 - 50 + 27
+    }
+
+
+    // ==================================================================
+    // GIFT POINTS FAILURE TESTS
+    // ==================================================================
+
+    @Test
+    void placeOrder_insufficientGiftPoints_throws() {
+        BasketResponse basket = basketWith(new BigDecimal("600.00"), 1);
+        when(basketService.getBasket(USER_ID, null)).thenReturn(basket);
+        when(addressRepository.findById(ADDRESS_ID)).thenReturn(Optional.of(address(USER_ID)));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(userWithPoints(20)));
+
+        PaymentRequest req = validRequest();
+        req.setGiftPointsToRedeem(50);  // user only has 20
+
+        assertThatThrownBy(() -> orderService.placeOrder(USER_ID, req))
+                .isInstanceOf(InsufficientGiftPointsException.class)
+                .hasMessage("Insufficient gift points");
+
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void placeOrder_giftPointsExceedBasket_throws() {
+        BasketResponse basket = basketWith(new BigDecimal("100.00"), 1);
+        when(basketService.getBasket(USER_ID, null)).thenReturn(basket);
+        when(addressRepository.findById(ADDRESS_ID)).thenReturn(Optional.of(address(USER_ID)));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(userWithPoints(500)));
+
+        PaymentRequest req = validRequest();
+        req.setGiftPointsToRedeem(200);  // basket total is only 100
+
+        assertThatThrownBy(() -> orderService.placeOrder(USER_ID, req))
+                .isInstanceOf(GiftPointsExceedBasketTotalException.class)
+                .hasMessage("Gift points exceed basket total");
+
+        verify(orderRepository, never()).save(any());
+    }
+
+
+    // ==================================================================
+    // EXISTING FAILURE TESTS
     // ==================================================================
 
     @Test
@@ -264,7 +403,7 @@ class OrderServiceTest {
     void placeOrder_addressForbidden_throws() {
         BasketResponse basket = basketWith(new BigDecimal("600.00"), 1);
         when(basketService.getBasket(USER_ID, null)).thenReturn(basket);
-        when(addressRepository.findById(ADDRESS_ID)).thenReturn(Optional.of(address(999L)));  // wrong owner
+        when(addressRepository.findById(ADDRESS_ID)).thenReturn(Optional.of(address(999L)));
 
         assertThatThrownBy(() -> orderService.placeOrder(USER_ID, validRequest()))
                 .isInstanceOf(AddressAccessForbiddenException.class);
@@ -292,7 +431,8 @@ class OrderServiceTest {
         BasketResponse basket = basketWith(new BigDecimal("600.00"), 5);
         when(basketService.getBasket(USER_ID, null)).thenReturn(basket);
         when(addressRepository.findById(ADDRESS_ID)).thenReturn(Optional.of(address(USER_ID)));
-        when(bookRepository.findById(BOOK_ID)).thenReturn(Optional.of(book(2)));  // only 2 in stock, need 5
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(userWithPoints(0)));
+        when(bookRepository.findById(BOOK_ID)).thenReturn(Optional.of(book(2)));
 
         assertThatThrownBy(() -> orderService.placeOrder(USER_ID, validRequest()))
                 .isInstanceOf(InsufficientStockException.class)
@@ -306,7 +446,7 @@ class OrderServiceTest {
     void placeOrder_expiredYear_throws() {
         // expiryYear is validated first — before getBasket or addressRepository is called
         PaymentRequest req = validRequest();
-        req.setExpiryYear(2000);  // well in the past
+        req.setExpiryYear(2000);
 
         assertThatThrownBy(() -> orderService.placeOrder(USER_ID, req))
                 .isInstanceOf(IllegalArgumentException.class)

@@ -22,7 +22,9 @@ public class OrderResponse {
     private List<OrderItemResponse> items;
     private BigDecimal basketTotal;
     private BigDecimal deliveryCharge;
+    private int giftPointsRedeemed;
     private BigDecimal totalAmount;
+    private int pointsAwarded;
     private String estimatedDeliveryDate;
     private OrderAddressSnapshot deliveryAddress;
 
@@ -53,8 +55,14 @@ public class OrderResponse {
     public BigDecimal getDeliveryCharge() { return deliveryCharge; }
     public void setDeliveryCharge(BigDecimal deliveryCharge) { this.deliveryCharge = deliveryCharge; }
 
+    public int getGiftPointsRedeemed() { return giftPointsRedeemed; }
+    public void setGiftPointsRedeemed(int giftPointsRedeemed) { this.giftPointsRedeemed = giftPointsRedeemed; }
+
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
+
+    public int getPointsAwarded() { return pointsAwarded; }
+    public void setPointsAwarded(int pointsAwarded) { this.pointsAwarded = pointsAwarded; }
 
     public String getEstimatedDeliveryDate() { return estimatedDeliveryDate; }
     public void setEstimatedDeliveryDate(String estimatedDeliveryDate) { this.estimatedDeliveryDate = estimatedDeliveryDate; }

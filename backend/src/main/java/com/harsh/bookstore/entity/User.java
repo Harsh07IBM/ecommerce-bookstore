@@ -88,6 +88,15 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * Loyalty currency balance (FEAT-09).
+     * Primitive int — never null, always >= 0.
+     * Starts at 0 on registration; incremented on each successful order;
+     * decremented when redeemed at checkout.
+     */
+    @Column(name = "gift_points", nullable = false)
+    private int giftPoints = 0;
+
 
     // ==================================================================
     // LIFECYCLE CALLBACK
@@ -139,6 +148,9 @@ public class User {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public int getGiftPoints() { return giftPoints; }
+    public void setGiftPoints(int giftPoints) { this.giftPoints = giftPoints; }
 
 
     // ==================================================================

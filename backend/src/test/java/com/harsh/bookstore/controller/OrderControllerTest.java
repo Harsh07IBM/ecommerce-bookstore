@@ -9,6 +9,8 @@ import com.harsh.bookstore.dto.PaymentRequest;
 import com.harsh.bookstore.entity.User;
 import com.harsh.bookstore.exception.AddressAccessForbiddenException;
 import com.harsh.bookstore.exception.AddressNotFoundException;
+import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
+import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.InsufficientStockException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
 import com.harsh.bookstore.repository.UserRepository;
@@ -234,6 +236,32 @@ class OrderControllerTest {
                         .content(objectMapper.writeValueAsString(validRequest())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Insufficient stock for: Clean Code"));
+    }
+
+    @Test
+    void placeOrder_returns400_insufficientGiftPoints() throws Exception {
+        when(orderService.placeOrder(eq(1L), any(PaymentRequest.class)))
+                .thenThrow(new InsufficientGiftPointsException());
+
+        mockMvc.perform(post("/api/orders")
+                        .with(authentication(userAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Insufficient gift points"));
+    }
+
+    @Test
+    void placeOrder_returns400_giftPointsExceedBasket() throws Exception {
+        when(orderService.placeOrder(eq(1L), any(PaymentRequest.class)))
+                .thenThrow(new GiftPointsExceedBasketTotalException());
+
+        mockMvc.perform(post("/api/orders")
+                        .with(authentication(userAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Gift points exceed basket total"));
     }
 
 

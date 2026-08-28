@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.harsh.bookstore.exception.InsufficientStockException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
 
+// FEAT-09 exception types
+import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
+import com.harsh.bookstore.exception.InsufficientGiftPointsException;
+
 
 
 /**
@@ -68,6 +72,46 @@ import com.harsh.bookstore.exception.PaymentDeclinedException;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+
+    // ==================================================================
+    // FEAT-09 handlers
+    // ==================================================================
+
+    /**
+     * 400 Bad Request — giftPointsToRedeem exceeds the user's current balance.
+     * Thrown by OrderService.placeOrder() (spec BR-05).
+     */
+    @ExceptionHandler(InsufficientGiftPointsException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientGiftPoints(
+            InsufficientGiftPointsException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+
+    /**
+     * 400 Bad Request — giftPointsToRedeem exceeds the basket total.
+     * Thrown by OrderService.placeOrder() (spec BR-06).
+     */
+    @ExceptionHandler(GiftPointsExceedBasketTotalException.class)
+    public ResponseEntity<ErrorResponse> handleGiftPointsExceedBasket(
+            GiftPointsExceedBasketTotalException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
 
 
     // ==================================================================

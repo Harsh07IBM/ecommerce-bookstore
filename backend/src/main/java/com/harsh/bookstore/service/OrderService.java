@@ -11,42 +11,56 @@ import com.harsh.bookstore.entity.DeliveryAddress;
 import com.harsh.bookstore.entity.Order;
 import com.harsh.bookstore.entity.OrderItem;
 import com.harsh.bookstore.entity.OrderStatus;
+import com.harsh.bookstore.entity.User;
 import com.harsh.bookstore.exception.AddressAccessForbiddenException;
 import com.harsh.bookstore.exception.AddressNotFoundException;
 import com.harsh.bookstore.exception.BookNotFoundException;
+import com.harsh.bookstore.exception.GiftPointsExceedBasketTotalException;
+import com.harsh.bookstore.exception.InsufficientGiftPointsException;
 import com.harsh.bookstore.exception.InsufficientStockException;
 import com.harsh.bookstore.exception.PaymentDeclinedException;
 import com.harsh.bookstore.repository.BookRepository;
 import com.harsh.bookstore.repository.DeliveryAddressRepository;
 import com.harsh.bookstore.repository.OrderRepository;
+import com.harsh.bookstore.repository.UserRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
 
 /**
- * OrderService — orchestrates the full payment and order creation flow (FEAT-08).
+ * OrderService — orchestrates the full payment and order creation flow (FEAT-08/09).
  *
  * TRANSACTION:
  *   placeOrder() is @Transactional — all mutations (stock decrement, order save,
- *   basket clear) run in one transaction. An exception thrown at any step rolls
- *   back all preceding mutations.
+ *   basket clear, user balance update) run in one transaction. An exception at
+ *   any step rolls back all preceding mutations.
  *
  * OPERATION ORDER (design D-07):
- *   1. Validate all inputs (year, empty basket, address, card decline)
- *   2. Check all stock levels (first pass — no mutations)
- *   3. Decrement all stock (second pass)
- *   4. Save Order (cascade saves OrderItems)
- *   5. Clear basket
+ *   1.  expiryYear validation
+ *   2.  empty basket check
+ *   3.  address ownership check
+ *   4.  card decline check
+ *   5a. load User
+ *   5b. gift point balance validation
+ *   5c. gift points vs basket total validation
+ *   6.  compute charges (delivery charge, gift discount, total, points awarded)
+ *   7.  stock validation pass (no mutations)
+ *   8.  stock decrement pass
+ *   9.  build + save Order
+ *   10. clear basket
+ *   11. mutate + save User balance
+ *   12. return response
  *
- * CARD DETAILS (spec BR-17 / design D-09):
- *   Card fields from PaymentRequest are used only in-memory for format validation
- *   and the decline check. They are never stored anywhere.
+ * CARD DETAILS (spec BR-17):
+ *   Card fields are used only in-memory for format validation and the decline
+ *   check. They are never stored anywhere.
  */
 @Service
 public class OrderService {
@@ -54,20 +68,24 @@ public class OrderService {
     private static final BigDecimal FREE_DELIVERY_THRESHOLD = new BigDecimal("500");
     private static final BigDecimal DELIVERY_CHARGE_AMOUNT  = new BigDecimal("50.00");
     private static final String     DECLINE_CARD_NUMBER     = "0000000000000000";
+    private static final BigDecimal POINTS_RATE             = new BigDecimal("0.05");
 
     private final OrderRepository orderRepository;
     private final BasketService basketService;
     private final DeliveryAddressRepository addressRepository;
     private final BookRepository bookRepository;
+    private final UserRepository userRepository;
 
     public OrderService(OrderRepository orderRepository,
                         BasketService basketService,
                         DeliveryAddressRepository addressRepository,
-                        BookRepository bookRepository) {
+                        BookRepository bookRepository,
+                        UserRepository userRepository) {
         this.orderRepository   = orderRepository;
         this.basketService     = basketService;
         this.addressRepository = addressRepository;
         this.bookRepository    = bookRepository;
+        this.userRepository    = userRepository;
     }
 
 
@@ -85,7 +103,7 @@ public class OrderService {
     @Transactional
     public OrderResponse placeOrder(Long userId, PaymentRequest req) {
 
-        // Step 1 — expiryYear runtime validation (design D-06)
+        // Step 1 — expiryYear runtime validation
         if (req.getExpiryYear() < LocalDate.now().getYear()) {
             throw new IllegalArgumentException("expiryYear must be the current year or later");
         }
@@ -108,15 +126,34 @@ public class OrderService {
             throw new PaymentDeclinedException();
         }
 
-        // Step 5 — compute charges (design D-05)
+        // Step 5a — load user (needed for gift point checks)
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + userId));
+
+        // Step 5b — gift point balance check (spec BR-05)
+        if (req.getGiftPointsToRedeem() > user.getGiftPoints()) {
+            throw new InsufficientGiftPointsException();
+        }
+
+        // Step 5c — gift points must not exceed basket total (spec BR-06)
+        if (new BigDecimal(req.getGiftPointsToRedeem()).compareTo(basket.getBasketTotal()) > 0) {
+            throw new GiftPointsExceedBasketTotalException();
+        }
+
+        // Step 6 — compute charges
         BigDecimal deliveryCharge =
                 basket.getBasketTotal().compareTo(FREE_DELIVERY_THRESHOLD) >= 0
                         ? BigDecimal.ZERO
                         : DELIVERY_CHARGE_AMOUNT;
-        BigDecimal totalAmount = basket.getBasketTotal().add(deliveryCharge);
+        BigDecimal giftDiscount  = new BigDecimal(req.getGiftPointsToRedeem());
+        BigDecimal totalAmount   = basket.getBasketTotal().add(deliveryCharge).subtract(giftDiscount);
+        int pointsAwarded        = totalAmount
+                                        .multiply(POINTS_RATE)
+                                        .setScale(0, RoundingMode.FLOOR)
+                                        .intValue();
         String estimatedDeliveryDate = LocalDate.now().plusDays(3).toString();
 
-        // Step 6 — stock validation pass (design D-07, first pass — no mutations yet)
+        // Step 7 — stock validation pass (first pass — no mutations yet)
         for (BasketItemDto item : basket.getItems()) {
             Book book = bookRepository.findById(item.getBookId())
                     .orElseThrow(() -> new BookNotFoundException(item.getBookId()));
@@ -125,22 +162,24 @@ public class OrderService {
             }
         }
 
-        // Step 7 — stock decrement pass (design D-07, second pass — all validations passed)
+        // Step 8 — stock decrement pass (second pass — all validations passed)
         for (BasketItemDto item : basket.getItems()) {
             Book book = bookRepository.findById(item.getBookId()).get();
             book.setStockQuantity(book.getStockQuantity() - item.getQuantity());
             bookRepository.save(book);
         }
 
-        // Step 8 — build and save Order
+        // Step 9 — build and save Order
         Order order = new Order();
         order.setUserId(userId);
         order.setStatus(OrderStatus.PAID);
         order.setBasketTotal(basket.getBasketTotal());
         order.setDeliveryCharge(deliveryCharge);
+        order.setGiftPointsRedeemed(req.getGiftPointsToRedeem());
         order.setTotalAmount(totalAmount);
+        order.setPointsAwarded(pointsAwarded);
         order.setEstimatedDeliveryDate(estimatedDeliveryDate);
-        // address snapshot (spec BR-16 / design D-02)
+        // address snapshot (spec BR-16)
         order.setRecipientName(address.getRecipientName());
         order.setPhoneNumber(address.getPhoneNumber());
         order.setLine1(address.getLine1());
@@ -164,10 +203,14 @@ public class OrderService {
 
         Order saved = orderRepository.save(order); // CascadeType.ALL saves OrderItems
 
-        // Step 9 — clear basket (spec BR-13 / design D-08)
+        // Step 10 — clear basket (spec BR-13)
         basketService.clearBasket(userId, null);
 
-        // Step 10 — build and return response
+        // Step 11 — mutate and save user balance (spec BR-08 / BR-09)
+        user.setGiftPoints(user.getGiftPoints() - req.getGiftPointsToRedeem() + pointsAwarded);
+        userRepository.save(user);
+
+        // Step 12 — build and return response
         return toResponse(saved);
     }
 
@@ -206,7 +249,9 @@ public class OrderService {
         response.setItems(itemResponses);
         response.setBasketTotal(order.getBasketTotal());
         response.setDeliveryCharge(order.getDeliveryCharge());
+        response.setGiftPointsRedeemed(order.getGiftPointsRedeemed());
         response.setTotalAmount(order.getTotalAmount());
+        response.setPointsAwarded(order.getPointsAwarded());
         response.setEstimatedDeliveryDate(order.getEstimatedDeliveryDate());
         response.setDeliveryAddress(addr);
         return response;
