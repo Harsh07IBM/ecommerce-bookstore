@@ -4,6 +4,8 @@ import com.harsh.bookstore.entity.Book;
 import com.harsh.bookstore.entity.Category;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
@@ -68,4 +70,10 @@ public interface BookRepository
      * Spring Data generates: SELECT * FROM book WHERE category_id = ? ORDER BY ... LIMIT ? OFFSET ?
      */
     Page<Book> findByCategory(Category category, Pageable pageable);
+
+    /**
+     * FEAT-15: returns books in the same category, excluding a specific book.
+     * Spring Data generates: SELECT * FROM book WHERE category_id = ? AND id <> ? ORDER BY title ASC LIMIT ?
+     */
+    List<Book> findByCategoryAndIdNot(Category category, Long excludeId, Pageable pageable);
 }

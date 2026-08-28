@@ -10,9 +10,12 @@ import com.harsh.bookstore.repository.BookSpecification;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 
 /**
@@ -160,6 +163,23 @@ public class BookService {
             page, size, Sort.by("createdAt").descending()
         );
         return bookRepository.findByCategory(category, pageRequest).map(this::toDto);
+    }
+
+
+    /**
+     * FEAT-15: return up to 5 books in the same category as the given book,
+     * excluding the book itself, sorted by title ascending.
+     *
+     * @throws BookNotFoundException if no book has the given id
+     */
+    public List<BookDto> getRelatedBooks(Long bookId) {
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new BookNotFoundException(bookId));
+        Pageable pageable = PageRequest.of(0, 5, Sort.by("title").ascending());
+        return bookRepository.findByCategoryAndIdNot(book.getCategory(), bookId, pageable)
+                .stream()
+                .map(this::toDto)
+                .toList();
     }
 
 

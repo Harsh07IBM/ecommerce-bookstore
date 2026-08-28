@@ -26,6 +26,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -177,6 +178,63 @@ class BookServiceTest {
         BookDto dto = bookService.getBookById(2L);
 
         assertThat(dto.getAvailability()).isEqualTo("OUT_OF_STOCK");
+    }
+
+
+    // ==================================================================
+    // FEAT-15 — getRelatedBooks
+    // ==================================================================
+
+    @Test
+    void getRelatedBooks_returnsUpTo5BooksInSameCategory() {
+        Book source = sampleBook(1L, "Source Book", 5);
+        Book related = sampleBook(2L, "Related Book", 3);
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(bookRepository.findByCategoryAndIdNot(
+                any(Category.class), eq(1L), any(Pageable.class)))
+                .thenReturn(List.of(related));
+
+        List<BookDto> result = bookService.getRelatedBooks(1L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getTitle()).isEqualTo("Related Book");
+    }
+
+    @Test
+    void getRelatedBooks_excludesSelf() {
+        Book source = sampleBook(1L, "Source Book", 5);
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(bookRepository.findByCategoryAndIdNot(
+                any(Category.class), eq(1L), any(Pageable.class)))
+                .thenReturn(List.of());
+
+        bookService.getRelatedBooks(1L);
+
+        ArgumentCaptor<Long> excludeCaptor = ArgumentCaptor.forClass(Long.class);
+        verify(bookRepository).findByCategoryAndIdNot(
+                any(Category.class), excludeCaptor.capture(), any(Pageable.class));
+        assertThat(excludeCaptor.getValue()).isEqualTo(1L);
+    }
+
+    @Test
+    void getRelatedBooks_returnsEmpty_whenNoRelatedBooks() {
+        Book source = sampleBook(1L, "Source Book", 5);
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(bookRepository.findByCategoryAndIdNot(
+                any(Category.class), eq(1L), any(Pageable.class)))
+                .thenReturn(List.of());
+
+        List<BookDto> result = bookService.getRelatedBooks(1L);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void getRelatedBooks_throws404_bookNotFound() {
+        when(bookRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> bookService.getRelatedBooks(99L))
+                .isInstanceOf(BookNotFoundException.class);
     }
 
 

@@ -238,15 +238,11 @@
 
 ---
 
-## 🟡 Tier 4 — Shopping Backend *(build order: 4th)*
+## ✅ Tier 4 — Shopping Backend *(build order: 4th)*
 
 > **Prerequisite:** Tier 2 complete (users and JWT auth exist). ✅
 > **Note:** Frontend (Tier 3) is built AFTER this tier, not before.
 > The core commercial flow — basket through payment, all as REST APIs.
-
-> ⚠️ **Open Questions to resolve BEFORE writing specs for remaining features:**
-> - FEAT-08: Is payment simulated or real gateway? What happens on failure? (§20, Q18–21)
-> - FEAT-09: How are gift points earned? What is their value? Do they expire? (§20, Q22–26)
 
 ---
 
@@ -311,192 +307,187 @@
 
 ---
 
-### [ ] FEAT-08 — Payment
+### [x] FEAT-08 — Payment
 
 | Field | Value |
 |---|---|
-| **Status** | 🔲 Not Started |
+| **Status** | ✅ Complete |
+| **Spec** | [docs/specs/feature-08-payment.md](specs/feature-08-payment.md) |
+| **Plan** | [docs/plans/feature-08-payment-plan.md](plans/feature-08-payment-plan.md) |
+| **Design** | [docs/designs/feature-08-payment-design.md](designs/feature-08-payment-design.md) |
 | **Business Requirements** | §13.1, §13.2, §13.3, §13.4, §13.5, BR-010, BR-012, A-004 |
 | **Depends On** | FEAT-07 (checkout + delivery address) |
 | **Blocks** | FEAT-09 (gift points), FEAT-10 (order creation), FEAT-13 (confirmation) |
 
-**What it will deliver:**
-- Payment initiation from basket/checkout
-- Credit card and debit card payment methods (§13.2)
-- Payment completion flow
-- Payment confirmation response
-- Simulated payment processing (real gateway is out of scope per §3.2 unless approved)
+**What it delivers:**
+- `POST /api/orders` — validates card, decrements stock, creates order, clears basket
+- Simulated payment (card `0000000000000000` → 402 declined)
+- Delivery charge: free ≥ ₹500, ₹50 below
+- Full `OrderResponse` on success
 
 **Lifecycle checklist:**
-- [ ] Simulated vs real payment decision made
-- [ ] Payment failure behaviour defined
-- [ ] Spec written and approved
-- [ ] Plan written and approved
-- [ ] Design written and approved
-- [ ] Code complete
-- [ ] Tests passing
+- [x] Simulated payment decided
+- [x] Payment failure behaviour defined (402 + `PaymentDeclinedException`)
+- [x] Spec written and approved
+- [x] Plan written and approved
+- [x] Design written and approved
+- [x] Code complete
+- [x] Tests passing (28 new tests — 163 total, 0 failures)
 
 ---
 
-### [ ] FEAT-09 — Gift Points Redemption
+### [x] FEAT-09 — Gift Points Redemption
 
 | Field | Value |
 |---|---|
-| **Status** | 🔲 Not Started |
+| **Status** | ✅ Complete |
+| **Spec** | [docs/specs/feature-09-gift-points.md](specs/feature-09-gift-points.md) |
+| **Plan** | [docs/plans/feature-09-gift-points-plan.md](plans/feature-09-gift-points-plan.md) |
+| **Design** | [docs/designs/feature-09-gift-points-design.md](designs/feature-09-gift-points-design.md) |
 | **Business Requirements** | §14.1, §14.2, BR-011 |
 | **Depends On** | FEAT-08 (payment flow) |
-| **Blocks** | FEAT-12 (cancellation — what happens to redeemed points?) |
+| **Blocks** | FEAT-12 (cancellation) |
 
-**What it will deliver:**
-- Display of available gift points at payment
-- Option to redeem eligible points against the order total
-- Points deducted from user balance on successful payment
-
-**Key open questions (ALL must be resolved before spec):**
-- How are gift points earned? (§20, Q22)
-- What is the monetary value of one point? (§20, Q23)
-- Maximum redeemable per order? (§20, Q24)
-- Do points expire? (§20, Q25)
-- What happens to redeemed points if order is cancelled? (§20, Q26)
+**What it delivers:**
+- `GET /api/users/me/gift-points` — view current balance
+- `giftPointsToRedeem` field on `POST /api/orders` — redeem at checkout
+- Earn: 5% of `totalAmount` floored, awarded on successful payment
+- 1 point = ₹1; no cap, no expiry, not refunded on cancellation
 
 **Lifecycle checklist:**
-- [ ] All gift point business rules decided
-- [ ] Spec written and approved
-- [ ] Plan written and approved
-- [ ] Design written and approved
-- [ ] Code complete
-- [ ] Tests passing
+- [x] All gift point business rules decided
+- [x] Spec written and approved
+- [x] Plan written and approved
+- [x] Design written and approved
+- [x] Code complete
+- [x] Tests passing (11 new tests — 174 total, 0 failures)
 
 ---
 
-> ✅ **Tier 4 complete when:** FEAT-06, FEAT-07, FEAT-08, and FEAT-09 are all checked off.
-> ➡️ **Next:** Move to Tier 5 — Post-Purchase Backend.
+> ✅ **Tier 4 complete.** FEAT-06, FEAT-07, FEAT-08, FEAT-09 all shipped.
+> ➡️ **Next:** Tier 5 — Post-Purchase Backend.
 
 ---
 
 ---
 
-## ⚫ Tier 5 — Post-Purchase Backend *(build order: 5th)*
+## ✅ Tier 5 — Post-Purchase Backend *(build order: 5th)*
 
-> **Prerequisite:** Tier 4 complete (payment and orders exist).
-> Features that operate on completed orders — all as REST APIs.
-
-> ⚠️ **Open Questions to resolve BEFORE writing specs:**
-> - FEAT-12: Does the 48-hour window start from order creation? (§20, Q11)
-> - FEAT-12: Which order statuses allow cancellation? (§20, Q12)
-> - FEAT-12: What happens to payment on cancellation? (§20, Q13–14)
+> **Prerequisite:** Tier 4 complete. ✅
 
 ---
 
-### [ ] FEAT-10 — Order Management & History
+### [x] FEAT-10 — Order Management & History
 
 | Field | Value |
 |---|---|
-| **Status** | 🔲 Not Started |
+| **Status** | ✅ Complete |
+| **Spec** | [docs/specs/feature-10-order-history.md](specs/feature-10-order-history.md) |
+| **Plan** | [docs/plans/feature-10-order-history-plan.md](plans/feature-10-order-history-plan.md) |
+| **Design** | [docs/designs/feature-10-order-history-design.md](designs/feature-10-order-history-design.md) |
 | **Business Requirements** | §11.1, §11.2, BR-006 |
 | **Depends On** | FEAT-08 (payment creates an order) |
 | **Blocks** | FEAT-11 (buy again), FEAT-12 (cancellation), FEAT-14 (recommendations) |
 
-**What it will deliver:**
-- Order created automatically on successful payment
-- Order detail view (items, quantities, prices, status, delivery address)
-- Order history list for the authenticated user
-- Order status tracking (e.g. Placed → Shipped → Delivered)
+**What it delivers:**
+- `GET /api/orders` — full order history, newest first
+- `GET /api/orders/{id}` — single order detail; 403 if wrong owner, 404 if missing
 
 **Lifecycle checklist:**
-- [ ] Spec written and approved
-- [ ] Plan written and approved
-- [ ] Design written and approved
-- [ ] Code complete
-- [ ] Tests passing
+- [x] Spec written and approved
+- [x] Plan written and approved
+- [x] Design written and approved
+- [x] Code complete
+- [x] Tests passing (12 new tests — 186 total, 0 failures)
 
 ---
 
-### [ ] FEAT-11 — Buy Again
+### [x] FEAT-11 — Buy Again
 
 | Field | Value |
 |---|---|
-| **Status** | 🔲 Not Started |
+| **Status** | ✅ Complete |
+| **Spec** | [docs/specs/feature-11-buy-again.md](specs/feature-11-buy-again.md) |
+| **Plan** | [docs/plans/feature-11-buy-again-plan.md](plans/feature-11-buy-again-plan.md) |
+| **Design** | [docs/designs/feature-11-buy-again-design.md](designs/feature-11-buy-again-design.md) |
 | **Business Requirements** | §11.3, BR-007 |
 | **Depends On** | FEAT-10 (order history) |
-| **Blocks** | Nothing — standalone convenience feature |
+| **Blocks** | Nothing |
 
-**What it will deliver:**
-- "Buy Again" action on a previous order or individual order item
-- Re-adds the selected book(s) to the current basket in one click
-- Checks current availability before adding
+**What it delivers:**
+- `POST /api/orders/{id}/buy-again` — re-adds all items from a past order to basket
+- Respects max-quantity-per-book (7) and out-of-stock rules; partial adds allowed
 
 **Lifecycle checklist:**
-- [ ] Spec written and approved
-- [ ] Plan written and approved
-- [ ] Design written and approved
-- [ ] Code complete
-- [ ] Tests passing
+- [x] Spec written and approved
+- [x] Plan written and approved
+- [x] Design written and approved
+- [x] Code complete
+- [x] Tests passing (9 new tests — 195 total, 0 failures)
 
 ---
 
-### [ ] FEAT-12 — Order Cancellation
+### [x] FEAT-12 — Order Cancellation
 
 | Field | Value |
 |---|---|
-| **Status** | 🔲 Not Started |
+| **Status** | ✅ Complete |
+| **Spec** | [docs/specs/feature-12-order-cancellation.md](specs/feature-12-order-cancellation.md) |
+| **Plan** | [docs/plans/feature-12-order-cancellation-plan.md](plans/feature-12-order-cancellation-plan.md) |
+| **Design** | [docs/designs/feature-12-order-cancellation-design.md](designs/feature-12-order-cancellation-design.md) |
 | **Business Requirements** | §11.4, BR-014 |
-| **Depends On** | FEAT-10 (order exists), FEAT-08 (payment exists) |
-| **Blocks** | Nothing — but must coordinate with gift-point reversal (FEAT-09) |
+| **Depends On** | FEAT-10, FEAT-08 |
+| **Blocks** | Nothing |
 
-**What it will deliver:**
-- Cancel order action available within 48 hours of order creation
-- Order status transitions to Cancelled
-- Payment reversal / refund initiation (rules to be decided)
-- Gift point restoration if redeemed on cancelled order
-
-**Key open questions (ALL must be resolved before spec):**
-- 48-hour window measured from when exactly? (§20, Q11)
-- Which statuses permit cancellation? Can a shipped order be cancelled? (§20, Q12)
-- What happens to payment? Is refund automatic? (§20, Q13–14)
+**What it delivers:**
+- `POST /api/orders/{id}/cancel` — cancels a PAID order within 48h of placement
+- Stock restored per item; gift points NOT refunded; no payment refund (simulated)
+- 400 if not PAID, 400 if window expired, 403 if wrong owner, 404 if not found
 
 **Lifecycle checklist:**
-- [ ] All cancellation business rules decided
-- [ ] Spec written and approved
-- [ ] Plan written and approved
-- [ ] Design written and approved
-- [ ] Code complete
-- [ ] Tests passing
+- [x] All cancellation business rules decided
+- [x] Spec written and approved
+- [x] Plan written and approved
+- [x] Design written and approved
+- [x] Code complete
+- [x] Tests passing (12 new tests — 207 total, 0 failures)
 
 ---
 
-### [ ] FEAT-13 — Purchase Confirmation
+### [x] FEAT-13 — Purchase Confirmation
 
 | Field | Value |
 |---|---|
-| **Status** | 🔲 Not Started |
+| **Status** | ✅ Complete |
+| **Spec** | [docs/specs/feature-13-purchase-confirmation.md](specs/feature-13-purchase-confirmation.md) |
+| **Plan** | [docs/plans/feature-13-purchase-confirmation-plan.md](plans/feature-13-purchase-confirmation-plan.md) |
+| **Design** | [docs/designs/feature-13-purchase-confirmation-design.md](designs/feature-13-purchase-confirmation-design.md) |
 | **Business Requirements** | §13.5, §16, BR-013 |
 | **Depends On** | FEAT-08 (payment), FEAT-10 (order) |
 | **Blocks** | Nothing |
 
-**What it will deliver:**
-- Confirmation screen shown immediately after successful payment
-- Displays: order summary, items purchased, total paid, delivery address, tentative delivery date
-- Clear success message as described in the wireframe (§16)
+**What it delivers:**
+- `GET /api/orders/{id}/confirmation` — full order detail plus a confirmation message
+- Returns `OrderConfirmationResponse` (superset of `OrderResponse`)
 
 **Lifecycle checklist:**
-- [ ] Confirmation screen content agreed (wireframe review)
-- [ ] Spec written and approved
-- [ ] Plan written and approved
-- [ ] Design written and approved
-- [ ] Code complete
-- [ ] Tests passing
+- [x] Confirmation screen content agreed
+- [x] Spec written and approved
+- [x] Plan written and approved
+- [x] Design written and approved
+- [x] Code complete
+- [x] Tests passing (8 new tests — 215 total, 0 failures)
 
 ---
 
-> ✅ **Tier 5 complete when:** FEAT-10, FEAT-11, FEAT-12, and FEAT-13 are all checked off.
-> ➡️ **Next:** Move to Tier 6 — Intelligence Backend.
+> ✅ **Tier 5 complete.** FEAT-10, FEAT-11, FEAT-12, FEAT-13 all shipped.
+> ➡️ **Next:** Tier 6 — Intelligence Backend.
 
 ---
 
 ---
 
-## 🟣 Tier 6 — Intelligence Backend *(build order: 6th)*
+## 🟡 Tier 6 — Intelligence Backend *(build order: 6th)*
 
 > **Prerequisite:** Tier 5 complete (order history exists and is meaningful).
 > Features that use accumulated data to improve the shopping experience — all as REST APIs.
@@ -510,59 +501,64 @@
 
 ---
 
-### [ ] FEAT-14 — Recommendations
+### [x] FEAT-14 — Recommendations
 
 | Field | Value |
 |---|---|
-| **Status** | 🔲 Not Started |
+| **Status** | ✅ Complete |
+| **Spec** | [docs/specs/feature-14-recommendations.md](specs/feature-14-recommendations.md) |
+| **Plan** | [docs/plans/feature-14-recommendations-plan.md](plans/feature-14-recommendations-plan.md) |
+| **Design** | [docs/designs/feature-14-recommendations-design.md](designs/feature-14-recommendations-design.md) |
 | **Business Requirements** | §6.5, §15.1, §15.2, BR-008, A-005 |
-| **Depends On** | FEAT-10 (order history to base recommendations on) |
+| **Depends On** | FEAT-10 (order history) |
 | **Blocks** | Nothing |
 
-**What it will deliver:**
-- Recommendations displayed during the shopping experience
-- Recommendations displayed within the basket (§10.4)
-- Based on the customer's previous order history (BR-008)
-- Simple rule-based algorithm (e.g. books in the same categories as past purchases)
+**What it delivers:**
+- `GET /api/recommendations` — up to 6 books from categories the user has previously purchased from
+- Excludes already-ordered books; sorted by title ascending
+- Requires JWT; guests receive 401
+- Returns `[]` for users with no past orders
 
 **Lifecycle checklist:**
-- [ ] Recommendation algorithm decided
-- [ ] Display contexts decided (catalogue page? basket? product detail?)
-- [ ] Spec written and approved
-- [ ] Plan written and approved
-- [ ] Design written and approved
-- [ ] Code complete
-- [ ] Tests passing
+- [x] Recommendation algorithm decided (rule-based: categories from order history)
+- [x] Spec written and approved
+- [x] Plan written and approved
+- [x] Design written and approved
+- [x] Code complete
+- [x] Tests passing (5 new tests — 221 total, 0 failures)
 
 ---
 
-### [ ] FEAT-15 — Related Products
+### [x] FEAT-15 — Related Products
 
 | Field | Value |
 |---|---|
-| **Status** | 🔲 Not Started |
+| **Status** | ✅ Complete |
+| **Spec** | [docs/specs/feature-15-related-products.md](specs/feature-15-related-products.md) |
+| **Plan** | [docs/plans/feature-15-related-products-plan.md](plans/feature-15-related-products-plan.md) |
+| **Design** | [docs/designs/feature-15-related-products-design.md](designs/feature-15-related-products-design.md) |
 | **Business Requirements** | §7.6, BR-004 |
-| **Depends On** | FEAT-01 (book detail page), FEAT-02 (category model) |
+| **Depends On** | FEAT-01, FEAT-02 |
 | **Blocks** | Nothing |
 
-**What it will deliver:**
-- Related books shown on the book detail page
-- Rule-based logic (e.g. same category, same author)
-- Clicking a related book navigates to that book's detail page
+**What it delivers:**
+- `GET /api/books/{id}/related` — up to 5 books in the same category, excluding the book itself
+- Sorted by title ascending; public endpoint (no auth required)
+- 404 if book not found; `[]` if no related books exist
 
 **Lifecycle checklist:**
-- [ ] "Related" definition agreed (same category? same author? both?)
-- [ ] Maximum number of related items decided
-- [ ] Spec written and approved
-- [ ] Plan written and approved
-- [ ] Design written and approved
-- [ ] Code complete
-- [ ] Tests passing
+- [x] "Related" definition agreed (same category)
+- [x] Maximum decided (5)
+- [x] Spec written and approved
+- [x] Plan written and approved
+- [x] Design written and approved
+- [x] Code complete
+- [x] Tests passing (6 new tests — 226 total, 0 failures)
 
 ---
 
-> ✅ **Tier 6 complete when:** FEAT-14 and FEAT-15 are both checked off.
-> ➡️ **Next:** Move to Tier 3 — Storefront Frontend (final tier).
+> ✅ **Tier 6 complete.** FEAT-14 and FEAT-15 shipped.
+> ➡️ **Next:** Tier 3 — Storefront Frontend (final tier).
 
 ---
 

@@ -145,4 +145,15 @@ public class BookController {
     public BookDto getBookById(@PathVariable Long id) {
         return bookService.getBookById(id);
     }
+
+
+    /**
+     * FEAT-15: return up to 5 books in the same category as the given book.
+     * Excludes the book itself. Sorted by title ascending.
+     * Public — no auth required (consistent with all GET /api/books/** endpoints).
+     */
+    @GetMapping("/{id}/related")
+    public List<BookDto> getRelatedBooks(@PathVariable Long id) {
+        return bookService.getRelatedBooks(id);
+    }
 }

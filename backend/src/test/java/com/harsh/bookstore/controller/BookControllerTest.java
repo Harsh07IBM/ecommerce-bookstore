@@ -210,6 +210,31 @@ class BookControllerTest {
 
 
     // ==================================================================
+    // FEAT-15 — GET /api/books/{id}/related
+    // ==================================================================
+
+    @Test
+    void getRelatedBooks_returns200() throws Exception {
+        BookDto related = sampleDto(2L, "Related Book");
+        when(bookService.getRelatedBooks(1L)).thenReturn(List.of(related));
+
+        mockMvc.perform(get("/api/books/1/related"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(2))
+                .andExpect(jsonPath("$[0].title").value("Related Book"));
+    }
+
+    @Test
+    void getRelatedBooks_returns404_notFound() throws Exception {
+        when(bookService.getRelatedBooks(99L)).thenThrow(new BookNotFoundException(99L));
+
+        mockMvc.perform(get("/api/books/99/related"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
+    }
+
+
+    // ==================================================================
     // Test helpers
     // ==================================================================
 
