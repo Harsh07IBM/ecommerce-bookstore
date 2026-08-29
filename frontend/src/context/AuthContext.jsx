@@ -11,15 +11,17 @@ export function AuthProvider({ children }) {
   const doLogin = async (email, password) => {
     const data = await apiLogin({ email, password });
     localStorage.setItem('token', data.token);
-    const u = { email, firstName: data.firstName, lastName: data.lastName };
+    // backend returns { token, user: { id, firstName, lastName, email } }
+    const u = { email: data.user.email, firstName: data.user.firstName, lastName: data.user.lastName };
     localStorage.setItem('user', JSON.stringify(u));
     setUser(u);
   };
 
   const doRegister = async (body) => {
     const data = await apiRegister(body);
+    // register now returns LoginResponse { token, user: { id, firstName, lastName, email } }
     localStorage.setItem('token', data.token);
-    const u = { email: body.email, firstName: body.firstName, lastName: body.lastName };
+    const u = { email: data.user.email, firstName: data.user.firstName, lastName: data.user.lastName };
     localStorage.setItem('user', JSON.stringify(u));
     setUser(u);
   };

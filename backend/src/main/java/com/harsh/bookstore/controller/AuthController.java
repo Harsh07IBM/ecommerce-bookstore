@@ -3,7 +3,6 @@ package com.harsh.bookstore.controller;
 import com.harsh.bookstore.dto.LoginRequest;
 import com.harsh.bookstore.dto.LoginResponse;
 import com.harsh.bookstore.dto.RegisterRequest;
-import com.harsh.bookstore.dto.UserDto;
 import com.harsh.bookstore.service.UserService;
 
 import jakarta.validation.Valid;
@@ -80,7 +79,7 @@ public class AuthController {
      */
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public UserDto register(@Valid @RequestBody RegisterRequest req) {
+    public LoginResponse register(@Valid @RequestBody RegisterRequest req) {
         return userService.register(req);
     }
 

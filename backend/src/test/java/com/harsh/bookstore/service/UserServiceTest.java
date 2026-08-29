@@ -3,7 +3,6 @@ package com.harsh.bookstore.service;
 import com.harsh.bookstore.dto.LoginRequest;
 import com.harsh.bookstore.dto.LoginResponse;
 import com.harsh.bookstore.dto.RegisterRequest;
-import com.harsh.bookstore.dto.UserDto;
 import com.harsh.bookstore.entity.User;
 import com.harsh.bookstore.exception.EmailAlreadyExistsException;
 import com.harsh.bookstore.exception.InvalidCredentialsException;
@@ -62,22 +61,22 @@ class UserServiceTest {
     // ==================================================================
 
     @Test
-    void register_success_returnsUserDtoWithNoPassword() {
+    void register_success_returnsLoginResponseWithTokenAndUser() {
         when(userRepository.existsByEmailIgnoreCase("harsh@example.com")).thenReturn(false);
         when(userRepository.save(any(User.class))).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             u.setId(1L);   // simulate DB assigning an id
             return u;
         });
+        when(jwtService.generateToken(any(User.class))).thenReturn("mock.token");
 
-        UserDto result = userService.register(registerRequest());
+        LoginResponse result = userService.register(registerRequest());
 
-        assertThat(result.getId()).isEqualTo(1L);
-        assertThat(result.getFirstName()).isEqualTo("Harsh");
-        assertThat(result.getLastName()).isEqualTo("Sharma");
-        assertThat(result.getEmail()).isEqualTo("harsh@example.com");
-        // UserDto has no passwordHash field — there's nothing to assert absent,
-        // but we can confirm save() was called with a hashed (not raw) password.
+        assertThat(result.getToken()).isEqualTo("mock.token");
+        assertThat(result.getUser().getId()).isEqualTo(1L);
+        assertThat(result.getUser().getFirstName()).isEqualTo("Harsh");
+        assertThat(result.getUser().getLastName()).isEqualTo("Sharma");
+        assertThat(result.getUser().getEmail()).isEqualTo("harsh@example.com");
     }
 
     @Test
@@ -88,6 +87,7 @@ class UserServiceTest {
             u.setId(1L);
             return u;
         });
+        when(jwtService.generateToken(any(User.class))).thenReturn("mock.token");
 
         userService.register(registerRequest());
 
@@ -112,6 +112,7 @@ class UserServiceTest {
             u.setId(1L);
             return u;
         });
+        when(jwtService.generateToken(any(User.class))).thenReturn("mock.token");
 
         RegisterRequest req = registerRequest();
         req.setEmail("HARSH@EXAMPLE.COM");  // mixed-case input

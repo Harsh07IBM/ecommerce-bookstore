@@ -66,21 +66,25 @@ class AuthControllerTest {
     // ==================================================================
 
     @Test
-    void register_returns201_withUserDto() throws Exception {
+    void register_returns201_withLoginResponse() throws Exception {
         UserDto dto = userDto(1L, "Harsh", "Sharma", "harsh@example.com");
-        when(userService.register(any(RegisterRequest.class))).thenReturn(dto);
+        LoginResponse resp = new LoginResponse();
+        resp.setToken("eyJhbGciOiJIUzI1NiJ9.mock.token");
+        resp.setUser(dto);
+        when(userService.register(any(RegisterRequest.class))).thenReturn(resp);
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequest())))
                 .andExpect(status().isCreated())                      // 201
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.firstName").value("Harsh"))
-                .andExpect(jsonPath("$.lastName").value("Sharma"))
-                .andExpect(jsonPath("$.email").value("harsh@example.com"))
+                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andExpect(jsonPath("$.user.id").value(1))
+                .andExpect(jsonPath("$.user.firstName").value("Harsh"))
+                .andExpect(jsonPath("$.user.lastName").value("Sharma"))
+                .andExpect(jsonPath("$.user.email").value("harsh@example.com"))
                 // passwordHash must NEVER appear in the response
-                .andExpect(jsonPath("$.passwordHash").doesNotExist())
-                .andExpect(jsonPath("$.password").doesNotExist());
+                .andExpect(jsonPath("$.user.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.user.password").doesNotExist());
     }
 
     @Test

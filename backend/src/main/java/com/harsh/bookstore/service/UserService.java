@@ -97,7 +97,7 @@ public class UserService implements UserDetailsService {
      * @return a UserDto representing the newly created account
      * @throws EmailAlreadyExistsException if the email is already registered
      */
-    public UserDto register(RegisterRequest req) {
+    public LoginResponse register(RegisterRequest req) {
         if (userRepository.existsByEmailIgnoreCase(req.getEmail())) {
             throw new EmailAlreadyExistsException();
         }
@@ -117,7 +117,14 @@ public class UserService implements UserDetailsService {
         user.setPasswordHash(passwordEncoder.encode(req.getPassword()));
 
         User saved = userRepository.save(user);
-        return toDto(saved);
+
+        // Issue a JWT immediately so the client is logged in right after
+        // registering — no need for a separate login round-trip.
+        String token = jwtService.generateToken(saved);
+        LoginResponse response = new LoginResponse();
+        response.setToken(token);
+        response.setUser(toDto(saved));
+        return response;
     }
 
 

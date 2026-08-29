@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
-  const { basket } = useBasket();
+  const { basket, reset: resetBasket } = useBasket();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -71,7 +71,7 @@ export default function Navbar() {
                   Orders
                 </Link>
                 <span className="hidden md:block text-sm text-gray-500">Hi, {user.firstName}</span>
-                <button onClick={() => { logout(); navigate('/'); }} className="text-sm text-gray-400 hover:text-red-400 transition-colors">
+                <button onClick={() => { logout(); resetBasket(); navigate('/'); }} className="text-sm text-gray-400 hover:text-red-400 transition-colors">
                   Sign out
                 </button>
               </div>

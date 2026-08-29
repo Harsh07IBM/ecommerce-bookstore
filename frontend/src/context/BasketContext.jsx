@@ -40,8 +40,11 @@ export function BasketProvider({ children }) {
     setBasket(data);
   };
 
+  // Called on logout so stale basket items are not visible to the next user/guest
+  const reset = () => setBasket({ items: [], totalItems: 0, basketTotal: 0 });
+
   return (
-    <BasketCtx.Provider value={{ basket, loading, refresh, add, update, remove, clear }}>
+    <BasketCtx.Provider value={{ basket, loading, refresh, add, update, remove, clear, reset }}>
       {children}
     </BasketCtx.Provider>
   );
