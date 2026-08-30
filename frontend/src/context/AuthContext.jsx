@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { login as apiLogin, register as apiRegister } from '../api';
+import { createContext, useContext, useState, useRef } from 'react';
+import { login as apiLogin, register as apiRegister, clearBasket } from '../api';
 
 const AuthCtx = createContext(null);
 
@@ -8,22 +8,35 @@ export function AuthProvider({ children }) {
     try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
   });
 
+  // Holds a reference to BasketContext's refresh() so AuthContext can
+  // trigger a basket reload after login/register without a circular import.
+  const basketRefreshRef = useRef(null);
+  const registerBasketRefresh = (fn) => { basketRefreshRef.current = fn; };
+
+  // After a guest signs in or registers:
+  //   1. Clear the guest session basket on the backend (wipes the cookie-based basket)
+  //   2. Reload the basket — now authenticated, backend returns the user's own basket
+  const resetGuestBasket = async () => {
+    try { await clearBasket(); } catch {}
+    if (basketRefreshRef.current) await basketRefreshRef.current();
+  };
+
   const doLogin = async (email, password) => {
     const data = await apiLogin({ email, password });
     localStorage.setItem('token', data.token);
-    // backend returns { token, user: { id, firstName, lastName, email } }
     const u = { email: data.user.email, firstName: data.user.firstName, lastName: data.user.lastName };
     localStorage.setItem('user', JSON.stringify(u));
     setUser(u);
+    await resetGuestBasket();
   };
 
   const doRegister = async (body) => {
     const data = await apiRegister(body);
-    // register now returns LoginResponse { token, user: { id, firstName, lastName, email } }
     localStorage.setItem('token', data.token);
     const u = { email: data.user.email, firstName: data.user.firstName, lastName: data.user.lastName };
     localStorage.setItem('user', JSON.stringify(u));
     setUser(u);
+    await resetGuestBasket();
   };
 
   const logout = () => {
@@ -33,7 +46,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthCtx.Provider value={{ user, doLogin, doRegister, logout }}>
+    <AuthCtx.Provider value={{ user, doLogin, doRegister, logout, registerBasketRefresh }}>
       {children}
     </AuthCtx.Provider>
   );

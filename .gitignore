@@ -82,3 +82,6 @@ $RECYCLE.BIN/
 *.pem
 *.key
 secrets/
+
+# ----- Temp / local run logs -----
+startup-log.txt

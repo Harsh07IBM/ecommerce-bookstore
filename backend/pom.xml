@@ -202,16 +202,26 @@
         </dependency>
 
         <!--
-          h2  —  the H2 in-memory database driver.
-          scope=runtime means we only need it when the app is running, not
-          when compiling. Our Java code never mentions "H2" by name — JPA
-          talks to it via the JDBC URL "jdbc:h2:mem:bookstore" that we'll
-          configure in application.properties.
+          PostgreSQL JDBC driver — connects the app to a PostgreSQL server.
+          scope=runtime: our Java code never imports Postgres classes directly;
+          Hibernate talks to the DB through the standard JDBC API.
+        -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!--
+          H2 in-memory database — kept in TEST scope only.
+          @DataJpaTest slices (BookRepositoryTest, UserRepositoryTest, etc.)
+          use H2 via application-test.properties so they remain fast and
+          self-contained without a running Postgres instance.
         -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <scope>runtime</scope>
+            <scope>test</scope>
         </dependency>
 
         <!--

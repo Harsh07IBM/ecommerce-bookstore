@@ -10,6 +10,11 @@ const headers = (json = true) => {
   return h;
 };
 
+// credentials:'include' sends the session cookie on every request so the
+// guest basket is consistently identified across GET and POST calls.
+const req = (url, opts = {}) =>
+  fetch(url, { credentials: 'include', ...opts }).then(handle);
+
 const handle = async (res) => {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -20,21 +25,21 @@ const handle = async (res) => {
 };
 
 // Books
-export const getBooks    = (params = '') => fetch(`${BASE}/books?${params}`, { headers: headers(false) }).then(handle);
-export const getBook     = (id)          => fetch(`${BASE}/books/${id}`,     { headers: headers(false) }).then(handle);
-export const getRelated  = (id)          => fetch(`${BASE}/books/${id}/related`, { headers: headers(false) }).then(handle);
-export const getCategories = ()          => fetch(`${BASE}/categories`,      { headers: headers(false) }).then(handle);
+export const getBooks    = (params = '') => req(`${BASE}/books?${params}`, { headers: headers(false) });
+export const getBook     = (id)          => req(`${BASE}/books/${id}`,     { headers: headers(false) });
+export const getRelated  = (id)          => req(`${BASE}/books/${id}/related`, { headers: headers(false) });
+export const getCategories = ()          => req(`${BASE}/categories`,      { headers: headers(false) });
 
 // Auth
-export const register = (body) => fetch(`${BASE}/auth/register`, { method: 'POST', headers: headers(), body: JSON.stringify(body) }).then(handle);
-export const login    = (body) => fetch(`${BASE}/auth/login`,    { method: 'POST', headers: headers(), body: JSON.stringify(body) }).then(handle);
+export const register = (body) => req(`${BASE}/auth/register`, { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+export const login    = (body) => req(`${BASE}/auth/login`,    { method: 'POST', headers: headers(), body: JSON.stringify(body) });
 
-// Basket
-export const getBasket    = ()         => fetch(`${BASE}/basket`,                  { headers: headers(false) }).then(handle);
-export const addToBasket  = (body)     => fetch(`${BASE}/basket/items`,            { method: 'POST', headers: headers(), body: JSON.stringify(body) }).then(handle);
-export const updateItem   = (id, body) => fetch(`${BASE}/basket/items/${id}`,      { method: 'PUT',  headers: headers(), body: JSON.stringify(body) }).then(handle);
-export const removeItem   = (id)       => fetch(`${BASE}/basket/items/${id}`,      { method: 'DELETE', headers: headers(false) }).then(handle);
-export const clearBasket  = ()         => fetch(`${BASE}/basket`,                  { method: 'DELETE', headers: headers(false) }).then(handle);
+// Basket — credentials included so guest session cookie is sent on every call
+export const getBasket    = ()         => req(`${BASE}/basket`,              { headers: headers(false) });
+export const addToBasket  = (body)     => req(`${BASE}/basket/items`,        { method: 'POST',   headers: headers(), body: JSON.stringify(body) });
+export const updateItem   = (id, body) => req(`${BASE}/basket/items/${id}`,  { method: 'PUT',    headers: headers(), body: JSON.stringify(body) });
+export const removeItem   = (id)       => req(`${BASE}/basket/items/${id}`,  { method: 'DELETE', headers: headers(false) });
+export const clearBasket  = ()         => req(`${BASE}/basket`,              { method: 'DELETE', headers: headers(false) });
 
 // Addresses
 export const getAddresses = ()     => fetch(`${BASE}/addresses`,     { headers: headers(false) }).then(handle);

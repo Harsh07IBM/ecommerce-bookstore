@@ -1,6 +1,7 @@
 package com.harsh.bookstore.repository;
 
 import com.harsh.bookstore.entity.Book;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
@@ -39,13 +40,18 @@ public class BookSpecification {
 
         return (root, query, cb) -> {
             query.distinct(true);
+            // authors is a List<String> @ElementCollection.
+            // Joining it gives a path whose value IS the element string directly —
+            // there is no sub-attribute to navigate into. Cast to Expression<String>
+            // so cb.lower() accepts it.
             Join<Object, Object> authorsJoin = root.join("authors", JoinType.LEFT);
+            Expression<String> authorExpr = authorsJoin.as(String.class);
 
             return cb.or(
                 cb.like(cb.lower(root.get("title")),       pattern),
                 cb.like(cb.lower(root.get("isbn")),        pattern),
                 cb.like(cb.lower(root.get("description")), pattern),
-                cb.like(cb.lower(authorsJoin.as(String.class)), pattern)
+                cb.like(cb.lower(authorExpr),              pattern)
             );
         };
     }

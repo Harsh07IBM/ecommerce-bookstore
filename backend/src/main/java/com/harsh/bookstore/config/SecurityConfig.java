@@ -78,7 +78,6 @@ public class SecurityConfig {
      *   GET  /api/books/**    — all catalogue read endpoints (FEAT-01/02/03)
      *   GET  /api/categories  — category list (FEAT-02)
      *   POST /api/auth/**     — register + login (this feature)
-     *   /h2-console/**        — H2 browser console (dev only)
      *   anyRequest()          — everything else requires authentication
      *
      * IMPORTANT: rules are evaluated IN ORDER and the first match wins.
@@ -99,6 +98,9 @@ public class SecurityConfig {
             // Disable CSRF — JWT in Authorization header, no cookies (see class Javadoc)
             .csrf(csrf -> csrf.disable())
 
+            // Enable Spring's CORS support — delegates to CorsConfig bean
+            .cors(cors -> cors.configure(http))
+
             // Create sessions only when needed (guest basket support — FEAT-06).
             // See class Javadoc for the rationale.
             .sessionManagement(sm ->
@@ -106,25 +108,18 @@ public class SecurityConfig {
 
             // Permit/deny rules
             .authorizeHttpRequests(auth -> auth
+                    // Browser CORS preflight — must always be allowed through
+                    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     // All catalogue read endpoints stay public (FEAT-01, 02, 03)
                     .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
                     // Auth endpoints must be public — you can't require a token to log in
                     .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
-                    // H2 console — dev only, allow all methods on this path
-                    .requestMatchers("/h2-console/**").permitAll()
                     // Basket endpoints are open to guests and authenticated users (FEAT-06)
                     .requestMatchers("/api/basket/**").permitAll()
                     // Every other endpoint (orders, etc.) requires a valid JWT
                     .anyRequest().authenticated()
             )
-
-            // H2 console uses <iframe> tags. Spring Security's default
-            // X-Frame-Options: DENY header blocks iframes. Disable that
-            // header so the H2 console renders correctly in the browser.
-            // Safe because the console is only accessible on localhost.
-            .headers(headers ->
-                    headers.frameOptions(fo -> fo.disable()))
 
             // Return 401 (not 403) for requests that reach a protected endpoint
             // without any authentication. Without this, Spring Security defaults

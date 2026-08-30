@@ -50,7 +50,7 @@ export default function App() {
         <BasketProvider>
           <AppRoutes />
           <Toaster
-            position="top-right"
+            position="top-left"
             toastOptions={{
               style: { background: '#1f2937', color: '#f3f4f6', border: '1px solid #374151' },
               success: { iconTheme: { primary: '#a72ecb', secondary: '#fff' } },

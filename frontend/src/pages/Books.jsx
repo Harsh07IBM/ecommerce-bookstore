@@ -29,7 +29,7 @@ export default function Books() {
     if (q) qp.set('q', q);
     if (category) qp.set('category', category);
     if (sort) qp.set('sort', sort);
-    if (availOnly) qp.set('availableOnly', true);
+    if (availOnly) qp.set('available', true);
     try {
       const data = await getBooks(qp.toString());
       setBooks(data.content || []);

@@ -21,7 +21,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -124,13 +123,13 @@ public class Book {
     /**
      * A long-form description of the book.
      *
-     * @Lob = "Large Object". It tells Hibernate to use a column type
-     * designed for long text — CLOB on H2, TEXT on Postgres/MySQL. Regular
-     * VARCHAR columns have length limits (typically a few thousand chars)
-     * that book descriptions can exceed.
+     * columnDefinition = "TEXT" maps to PostgreSQL's TEXT type (unlimited length).
+     * We use this instead of @Lob because @Lob on a String maps to OID in
+     * PostgreSQL (a binary large object reference), which breaks LIKE queries
+     * and causes cast errors. TEXT is the correct unbounded string type in Postgres.
+     * In H2 (used for tests), TEXT is also a valid column type — no change needed there.
      */
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
 
     /**

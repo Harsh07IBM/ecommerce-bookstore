@@ -1,9 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as api from '../api';
+import { useAuth } from './AuthContext';
 
 const BasketCtx = createContext(null);
 
 export function BasketProvider({ children }) {
+  const { registerBasketRefresh } = useAuth();
   const [basket, setBasket] = useState({ items: [], totalItems: 0, basketTotal: 0 });
   const [loading, setLoading] = useState(false);
 
@@ -13,6 +15,10 @@ export function BasketProvider({ children }) {
       setBasket(data);
     } catch {}
   }, []);
+
+  // Register refresh with AuthContext so it can reload the basket
+  // after login/register (clearing the stale guest basket from the UI).
+  useEffect(() => { registerBasketRefresh(refresh); }, [refresh, registerBasketRefresh]);
 
   useEffect(() => { refresh(); }, [refresh]);
 

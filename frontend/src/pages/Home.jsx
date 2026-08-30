@@ -104,11 +104,33 @@ export default function Home() {
         )}
       </section>
 
-      {/* ── CTA BANNER ───────────────────────────────── */}
-      <section className="bg-gradient-to-r from-brand-900 via-brand-800 to-brand-900 py-16 text-center px-4">
-        <h2 className="font-serif text-3xl font-bold text-white mb-3">Earn Gift Points on Every Purchase</h2>
-        <p className="text-brand-200 mb-6 max-w-lg mx-auto">Get 5% of your order value back as points. Redeem them on your next order.</p>
-        <Link to="/register" className="btn-primary text-base px-8 py-3 inline-block">Get Started Free</Link>
+      {/* ── GIFT POINTS BANNER ───────────────────────── */}
+      <section className="relative overflow-hidden bg-gray-900 border-y border-gray-800 py-20 px-4">
+        {/* subtle ambient glow — much quieter than before */}
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-900/10 via-transparent to-transparent pointer-events-none" />
+
+        <div className="relative max-w-4xl mx-auto grid sm:grid-cols-3 gap-10 items-center">
+          {/* Three perks */}
+          {[
+            { icon: '🎁', title: 'Earn on Every Order', body: '5% of your total comes back as gift points, automatically.' },
+            { icon: '💸', title: '1 Point = ₹1', body: 'Points have real monetary value. Redeem them at checkout, no minimum.' },
+            { icon: '♾️', title: 'No Expiry, No Cap', body: "Your points never expire and there's no limit to how many you can earn." },
+          ].map(({ icon, title, body }) => (
+            <div key={title} className="flex flex-col items-center text-center gap-3">
+              <span className="text-3xl">{icon}</span>
+              <h3 className="font-semibold text-white text-base">{title}</h3>
+              <p className="text-sm text-gray-400 leading-relaxed">{body}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Understated CTA */}
+        <p className="relative text-center mt-12 text-sm text-gray-500">
+          Points are applied automatically when you have an account.{' '}
+          <Link to="/register" className="text-brand-400 hover:text-brand-300 transition-colors font-medium underline underline-offset-2">
+            Create a free account →
+          </Link>
+        </p>
       </section>
     </div>
   );
