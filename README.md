@@ -1,6 +1,11 @@
 # 📚 Ink&Pages — E-Commerce Bookstore
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-ecommerce--bookstore--gamma.vercel.app-brightgreen?style=for-the-badge)](https://ecommerce-bookstore-gamma.vercel.app)
+[![Backend API](https://img.shields.io/badge/Backend%20API-Railway-blueviolet?style=for-the-badge)](https://ecommerce-bookstore-production.up.railway.app/api/books)
+
 A full-stack e-commerce bookstore built with **Spring Boot** and **React**, following a structured, spec-driven development process. Browse 113+ real books, manage a basket as a guest or signed-in user, place orders, and earn gift points on every purchase.
+
+> 🌐 **Live at: https://ecommerce-bookstore-gamma.vercel.app**
 
 ---
 
