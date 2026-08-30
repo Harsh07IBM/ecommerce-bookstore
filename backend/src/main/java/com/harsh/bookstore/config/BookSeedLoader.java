@@ -13,9 +13,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -67,21 +69,28 @@ public class BookSeedLoader implements CommandLineRunner {
             return;
         }
 
-        File file = new File(seedFilePath);
-        if (!file.exists()) {
-            log.warn("Seed file not found at {} — starting with empty catalogue",
-                     file.getAbsolutePath());
-            return;
-        }
-
-        // Read the JSON as a raw list of maps so we can control how
-        // the "category" string field is resolved to a Category entity.
         ObjectMapper mapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-        List<Map<String, Object>> rawBooks = mapper.readValue(
-            file, new TypeReference<List<Map<String, Object>>>() {}
-        );
+        // Resolve the seed data: try the configured file path first (local dev),
+        // then fall back to the classpath resource bundled inside the JAR (production).
+        List<Map<String, Object>> rawBooks;
+        File file = new File(seedFilePath);
+        if (file.exists()) {
+            log.info("Loading seed data from file: {}", file.getAbsolutePath());
+            rawBooks = mapper.readValue(file, new TypeReference<List<Map<String, Object>>>() {});
+        } else {
+            ClassPathResource cp = new ClassPathResource("books.json");
+            if (!cp.exists()) {
+                log.warn("Seed file not found at {} and no classpath fallback — starting with empty catalogue",
+                         file.getAbsolutePath());
+                return;
+            }
+            log.info("Seed file not found on disk — loading from classpath resource books.json");
+            try (InputStream is = cp.getInputStream()) {
+                rawBooks = mapper.readValue(is, new TypeReference<List<Map<String, Object>>>() {});
+            }
+        }
 
         // --- Step 1: collect distinct category names and save them ---
         // LinkedHashMap preserves insertion order — deterministic logs.
